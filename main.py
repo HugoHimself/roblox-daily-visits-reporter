@@ -225,16 +225,18 @@ def build_message(
 
         for name, uid in game_list:
             uid_str = str(uid)
-            visits = yesterday_visits.get(uid_str, 0)
+            visits = yesterday_visits.get(uid_str)
             ccu = today_ccu.get(uid_str, 0)
-            grand_today += visits
+            if visits is not None:
+                grand_today += visits
 
             wow_base = wow_visits.get(uid_str) if wow_visits else None
             grand_wow += wow_base or 0
 
-            pct = wow_pct(visits, wow_base) if wow_base is not None else None
+            pct = wow_pct(visits, wow_base) if (visits is not None and wow_base is not None) else None
+            visits_str = f"{visits:,} visits" if visits is not None else "N/A visits"
             lines.append(
-                f"  {name}: {visits:,} visits ({format_pct(pct, weekday_abbr, wow_base)}) — {ccu:,} CCU"
+                f"  {name}: {visits_str} ({format_pct(pct, weekday_abbr, wow_base)}) — {ccu:,} CCU"
             )
 
         lines.append("")
@@ -317,12 +319,8 @@ def main() -> None:
     # 3. Compute yesterday's visits (snap[today] - snap[yesterday])
     yesterday_visits = get_daily_visits(visit_snapshots, today_str, yesterday_str)
     if yesterday_visits is None:
-        print(
-            f"[ERROR] Missing snapshot for {yesterday_str}. "
-            "Need at least two consecutive daily runs to compute visit deltas.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        print("No yesterday snapshot — first run. Visits will show as N/A.")
+        yesterday_visits = {}
 
     # 4. Compute WoW base visits; None if not enough history
     wow_visits = get_daily_visits(visit_snapshots, wow_date_str, wow_prev_date_str)
