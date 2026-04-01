@@ -9,8 +9,8 @@ env/
 # Environment variables
 .env
 
-# Data — snapshots grow over time; back up separately or commit intentionally
-data/visits.json
+# Data — snapshots stored in PostgreSQL on Render; local files only
+data/
 
 # OS
 .DS_Store
