@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Environment variables
+.env
+
+# Data — snapshots grow over time; back up separately or commit intentionally
+data/visits.json
+
+# OS
+.DS_Store
+Thumbs.db
