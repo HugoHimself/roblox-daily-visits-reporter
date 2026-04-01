@@ -16,3 +16,17 @@ services:
         fromDatabase:
           name: roblox-visits-db
           property: connectionString
+
+  - type: cron
+    name: roblox-weekly-summary
+    runtime: python
+    schedule: "0 8 * * 1"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py --weekly
+    envVars:
+      - key: SLACK_BOT_TOKEN
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: roblox-visits-db
+          property: connectionString
