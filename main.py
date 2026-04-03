@@ -214,52 +214,82 @@ def categorize_games(today_ccu: dict[str, int]) -> dict[str, list[tuple[str, int
 # Daily message
 # ---------------------------------------------------------------------------
 
+def _build_game_lines(
+    game_list: list[tuple[str, int]],
+    yesterday_visits: dict[str, int],
+    wow_visits: dict[str, int] | None,
+    today_ccu: dict[str, int],
+    vs_label: str,
+) -> tuple[list[str], int, int]:
+    """Returns (lines, grand_today, grand_wow) for a list of games."""
+    lines = []
+    grand_today = 0
+    grand_wow = 0
+    game_list.sort(key=lambda x: yesterday_visits.get(str(x[1]), 0), reverse=True)
+    for name, uid in game_list:
+        uid_str = str(uid)
+        visits = yesterday_visits.get(uid_str)
+        ccu = today_ccu.get(uid_str, 0)
+        if visits is not None:
+            grand_today += visits
+        wow_base = wow_visits.get(uid_str) if wow_visits else None
+        grand_wow += wow_base or 0
+        pct = wow_pct(visits, wow_base) if (visits is not None and wow_base is not None) else None
+        visits_str = f"{visits:,} visits" if visits is not None else "N/A visits"
+        lines.append(f"  {name}: {visits_str} ({format_pct(pct, vs_label, wow_base)}) — {ccu:,} CCU")
+    return lines, grand_today, grand_wow
+
+
 def build_daily_message(
     yesterday: date,
     yesterday_visits: dict[str, int],
     wow_visits: dict[str, int] | None,
     today_ccu: dict[str, int],
-) -> str:
+) -> tuple[str, str | None]:
+    """Returns (main_message, thread_message).
+    main_message contains Active games + total.
+    thread_message contains Non-Active games (None if empty).
+    """
     vs_label = f"last {WEEKDAY_SHORT[yesterday.weekday()]}"
     date_label = yesterday.strftime("%A, %B ") + str(yesterday.day)
-
-    lines = [f"📊 Roblox Daily Visits — {date_label}", ""]
-
     categories = categorize_games(today_ccu)
-    icons = {"Active": "🟢", "Non-Active": "🔴"}
-    grand_today = 0
-    grand_wow = 0
 
-    for category, game_list in categories.items():
-        if not game_list:
-            continue
-
-        lines.append(f"{icons[category]} {category} Games")
-        game_list.sort(key=lambda x: yesterday_visits.get(str(x[1]), 0), reverse=True)
-
-        for name, uid in game_list:
-            uid_str = str(uid)
-            visits = yesterday_visits.get(uid_str)
-            ccu = today_ccu.get(uid_str, 0)
-            if visits is not None:
-                grand_today += visits
-
-            wow_base = wow_visits.get(uid_str) if wow_visits else None
-            grand_wow += wow_base or 0
-
-            pct = wow_pct(visits, wow_base) if (visits is not None and wow_base is not None) else None
-            visits_str = f"{visits:,} visits" if visits is not None else "N/A visits"
-            lines.append(
-                f"  {name}: {visits_str} ({format_pct(pct, vs_label, wow_base)}) — {ccu:,} CCU"
-            )
-
+    # --- Main message: Active games + Total ---
+    weekday_full = yesterday.strftime("%A")
+    lines = [
+        f"📊 Roblox Daily Visits — {date_label}",
+        f"Here are the active visits we got on {weekday_full}. Non-active games are in thread. 🧵",
+        "",
+    ]
+    active_lines, grand_today, grand_wow = _build_game_lines(
+        categories["Active"], yesterday_visits, wow_visits, today_ccu, vs_label
+    )
+    if active_lines:
+        lines.append("🟢 Active Games")
+        lines.extend(active_lines)
         lines.append("")
+
+    # Add Non-Active totals to grand total
+    _, na_today, na_wow = _build_game_lines(
+        categories["Non-Active"], yesterday_visits, wow_visits, today_ccu, vs_label
+    )
+    grand_today += na_today
+    grand_wow += na_wow
 
     total_pct = wow_pct(grand_today, grand_wow) if wow_visits and grand_wow else None
     total_wow_base = grand_wow if wow_visits and grand_wow else None
     lines.append(f"📈 Total: {grand_today:,} visits ({format_pct(total_pct, vs_label, total_wow_base)})")
 
-    return "\n".join(lines)
+    # --- Thread message: Non-Active games ---
+    thread_message = None
+    if categories["Non-Active"]:
+        na_lines, _, _ = _build_game_lines(
+            categories["Non-Active"], yesterday_visits, wow_visits, today_ccu, vs_label
+        )
+        thread_lines = ["🔴 Non-Active Games"] + na_lines
+        thread_message = "\n".join(thread_lines)
+
+    return "\n".join(lines), thread_message
 
 
 # ---------------------------------------------------------------------------
@@ -270,7 +300,7 @@ def build_weekly_message(
     today: date,
     visit_snapshots: dict,
     ccu_snapshots: dict,
-) -> str | None:
+) -> tuple[str, str | None] | None:
     """
     Weekly total = snap[today] - snap[today-7].
     Prev week    = snap[today-7] - snap[today-14].
@@ -301,49 +331,62 @@ def build_weekly_message(
     grand_week = 0
     grand_prev = 0
 
-    for category, game_list in categories.items():
-        if not game_list:
-            continue
+    def game_week_visits(uid: int) -> tuple[int, int | None]:
+        uid_str = str(uid)
+        this_week = max(0, week_snap.get(uid_str, 0) - prev_snap.get(uid_str, 0))
+        prev_week = max(0, prev_snap.get(uid_str, 0) - older_snap.get(uid_str, 0)) if older_snap else None
+        return this_week, prev_week
 
-        lines.append(f"{icons[category]} {category} Games")
-
-        # Compute weekly visits per game for sorting
-        def weekly_visits(uid: int) -> int:
-            uid_str = str(uid)
-            return max(0, week_snap.get(uid_str, 0) - prev_snap.get(uid_str, 0))
-
-        game_list.sort(key=lambda x: weekly_visits(x[1]), reverse=True)
-
+    def build_weekly_game_lines(game_list: list[tuple[str, int]]) -> tuple[list[str], int, int]:
+        game_list.sort(key=lambda x: game_week_visits(x[1])[0], reverse=True)
+        g_lines, g_week, g_prev = [], 0, 0
         for name, uid in game_list:
-            uid_str = str(uid)
-            this_week = max(0, week_snap.get(uid_str, 0) - prev_snap.get(uid_str, 0))
-            prev_week = max(0, prev_snap.get(uid_str, 0) - older_snap.get(uid_str, 0)) if older_snap else None
-            grand_week += this_week
-            grand_prev += prev_week or 0
-
+            this_week, prev_week = game_week_visits(uid)
+            g_week += this_week
+            g_prev += prev_week or 0
             pct = wow_pct(this_week, prev_week) if prev_week else None
-            lines.append(
-                f"  {name}: {this_week:,} visits ({format_pct(pct, 'prev week', prev_week)})"
-            )
+            g_lines.append(f"  {name}: {this_week:,} visits ({format_pct(pct, 'prev week', prev_week)})")
+        return g_lines, g_week, g_prev
 
+    # Active games in main message
+    active_lines, grand_week, grand_prev = build_weekly_game_lines(categories["Active"])
+    if active_lines:
+        lines.append(f"{icons['Active']} Active Games")
+        lines.extend(active_lines)
         lines.append("")
+
+    # Add Non-Active to grand totals
+    _, na_week, na_prev = build_weekly_game_lines(list(categories["Non-Active"]))
+    grand_week += na_week
+    grand_prev += na_prev
 
     total_pct = wow_pct(grand_week, grand_prev) if grand_prev else None
     total_prev = grand_prev if grand_prev else None
     lines.append(f"📈 Total: {grand_week:,} visits ({format_pct(total_pct, 'prev week', total_prev)})")
 
-    return "\n".join(lines)
+    # Non-Active in thread
+    thread_message = None
+    if categories["Non-Active"]:
+        na_lines, _, _ = build_weekly_game_lines(list(categories["Non-Active"]))
+        thread_message = "\n".join([f"{icons['Non-Active']} Non-Active Games"] + na_lines)
+
+    return "\n".join(lines), thread_message
 
 
 # ---------------------------------------------------------------------------
 # Slack
 # ---------------------------------------------------------------------------
 
-def post_to_slack(message: str) -> None:
+def post_to_slack(message: str, thread_ts: str | None = None) -> str:
+    """Posts a message and returns its ts (used to thread replies)."""
     token = os.environ.get("SLACK_BOT_TOKEN")
     if not token:
         print("[ERROR] SLACK_BOT_TOKEN environment variable is not set.", file=sys.stderr)
         sys.exit(1)
+
+    payload: dict = {"channel": SLACK_CHANNEL_ID, "text": message}
+    if thread_ts:
+        payload["thread_ts"] = thread_ts
 
     try:
         resp = requests.post(
@@ -352,7 +395,7 @@ def post_to_slack(message: str) -> None:
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json",
             },
-            json={"channel": SLACK_CHANNEL_ID, "text": message},
+            json=payload,
             timeout=15,
         )
         resp.raise_for_status()
@@ -364,6 +407,8 @@ def post_to_slack(message: str) -> None:
     if not result.get("ok"):
         print(f"[ERROR] Slack API error: {result.get('error')}", file=sys.stderr)
         sys.exit(1)
+
+    return result["ts"]
 
 
 # ---------------------------------------------------------------------------
@@ -402,9 +447,10 @@ def main() -> None:
 
     # --- Weekly mode ---
     if args.weekly:
-        message = build_weekly_message(today, visit_snapshots, ccu_snapshots)
-        if message is None:
+        result = build_weekly_message(today, visit_snapshots, ccu_snapshots)
+        if result is None:
             sys.exit(0)  # Not enough data yet — silent exit, not an error
+        message = result
     else:
         # --- Daily mode ---
         yesterday_visits = get_visit_delta(visit_snapshots, today_str, yesterday_str)
@@ -418,12 +464,19 @@ def main() -> None:
 
         message = build_daily_message(today - timedelta(days=1), yesterday_visits, wow_visits, today_ccu)
 
+    main_message, thread_message = message
+
     if args.dry_run:
-        sys.stdout.buffer.write(b"\n--- DRY RUN ---\n")
-        sys.stdout.buffer.write(message.encode("utf-8") + b"\n")
+        sys.stdout.buffer.write(b"\n--- DRY RUN (main) ---\n")
+        sys.stdout.buffer.write(main_message.encode("utf-8") + b"\n")
+        if thread_message:
+            sys.stdout.buffer.write(b"\n--- DRY RUN (thread reply) ---\n")
+            sys.stdout.buffer.write(thread_message.encode("utf-8") + b"\n")
         sys.stdout.buffer.write(b"--- END ---\n\n")
     else:
-        post_to_slack(message)
+        ts = post_to_slack(main_message)
+        if thread_message:
+            post_to_slack(thread_message, thread_ts=ts)
         print("Message posted to Slack successfully.")
 
 
