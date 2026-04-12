@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Buddy's Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3248;
+      --text: #e8eaf0;
+      --muted: #7b82a0;
+      --accent: #6c63ff;
+      --green: #22c55e;
+      --red: #ef4444;
+    }
+
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-icon { font-size: 26px; }
+    .logo-text { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+    .logo-sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+    .range-btns { display: flex; gap: 6px; }
+    .range-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .range-btn:hover { color: var(--text); border-color: var(--accent); }
+    .range-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    main { max-width: 1400px; margin: 0 auto; padding: 28px 32px; }
+
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 24px;
+    }
+    .stat-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .stat-value { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+    .stat-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .stat-delta { font-size: 13px; margin-top: 4px; font-weight: 500; }
+    .up { color: var(--green); }
+    .down { color: var(--red); }
+
+    .charts-grid { display: grid; grid-template-columns: 1fr; gap: 24px; }
+
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .chart-title { font-size: 15px; font-weight: 600; }
+    .chart-subtitle { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+    .toggle-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .game-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+    .game-toggle.hidden { opacity: 0.35; }
+    .game-toggle:hover { border-color: var(--accent); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+    canvas { max-height: 340px; }
+
+    .loading { color: var(--muted); font-size: 14px; text-align: center; padding: 60px; }
+
+    @media (max-width: 900px) {
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      header { flex-direction: column; gap: 12px; }
+      main { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="logo-icon">🎮</span>
+    <div>
+      <div class="logo-text">Buddy's Dashboard</div>
+      <div class="logo-sub">Exclusible · Roblox Visit Analytics</div>
+    </div>
+  </div>
+  <div class="range-btns">
+    <button class="range-btn" data-days="7">7d</button>
+    <button class="range-btn" data-days="14">14d</button>
+    <button class="range-btn active" data-days="30">30d</button>
+    <button class="range-btn" data-days="0">All</button>
+  </div>
+</header>
+
+<main>
+  <div id="loading" class="loading">Loading data…</div>
+  <div id="content" style="display:none">
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Yesterday's Visits</div>
+        <div class="stat-value" id="stat-yesterday">—</div>
+        <div class="stat-delta" id="stat-yesterday-delta"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Best Single Day</div>
+        <div class="stat-value" id="stat-best">—</div>
+        <div class="stat-sub" id="stat-best-date"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Top Game (Yesterday)</div>
+        <div class="stat-value" id="stat-top-game">—</div>
+        <div class="stat-sub" id="stat-top-visits"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg Daily Visits</div>
+        <div class="stat-value" id="stat-avg">—</div>
+        <div class="stat-sub">over selected period</div>
+      </div>
+    </div>
+
+    <div class="charts-grid">
+
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Total Daily Visits</div>
+            <div class="chart-subtitle">All games combined</div>
+          </div>
+        </div>
+        <canvas id="totalChart"></canvas>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Visits per Game</div>
+            <div class="chart-subtitle">Click a game to show/hide</div>
+          </div>
+        </div>
+        <div class="toggle-row" id="toggleRow"></div>
+        <canvas id="gamesChart"></canvas>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<script>
+const COLORS = [
+  '#6c63ff','#22c55e','#f59e0b','#ef4444','#06b6d4','#ec4899',
+  '#84cc16','#f97316','#a855f7','#14b8a6','#eab308','#3b82f6',
+  '#10b981','#f43f5e','#8b5cf6','#0ea5e9','#d946ef','#fb923c',
+  '#4ade80','#2dd4bf','#facc15',
+];
+
+let allData = null;
+let totalChart = null;
+let gamesChart = null;
+let activeDays = 30;
+let hiddenGames = new Set();
+
+function fmt(n) {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
+  return n.toLocaleString();
+}
+
+function fmtFull(n) { return n.toLocaleString(); }
+
+function fmtDate(iso) {
+  const [y, m, d] = iso.split('-');
+  return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+function sliceData(data) {
+  if (activeDays === 0 || data.dates.length <= activeDays) return data;
+  const n = activeDays;
+  return {
+    dates: data.dates.slice(-n),
+    total: data.total.slice(-n),
+    games: Object.fromEntries(
+      Object.entries(data.games).map(([k, v]) => [k, v.slice(-n)])
+    ),
+  };
+}
+
+function updateStats(d) {
+  const last = d.total[d.total.length - 1] ?? 0;
+  const prev = d.total[d.total.length - 2] ?? null;
+  document.getElementById('stat-yesterday').textContent = fmtFull(last);
+
+  if (prev !== null) {
+    const pct = ((last - prev) / prev * 100).toFixed(1);
+    const el = document.getElementById('stat-yesterday-delta');
+    el.textContent = (pct >= 0 ? '▲ +' : '▼ ') + pct + '% vs day before';
+    el.className = 'stat-delta ' + (pct >= 0 ? 'up' : 'down');
+  }
+
+  const bestIdx = d.total.indexOf(Math.max(...d.total));
+  document.getElementById('stat-best').textContent = fmtFull(d.total[bestIdx]);
+  document.getElementById('stat-best-date').textContent = fmtDate(d.dates[bestIdx]);
+
+  const lastGames = Object.entries(d.games).map(([name, vals]) => [name, vals[vals.length - 1] ?? 0]);
+  lastGames.sort((a, b) => b[1] - a[1]);
+  document.getElementById('stat-top-game').textContent = lastGames[0]?.[0] ?? '—';
+  document.getElementById('stat-top-visits').textContent = fmtFull(lastGames[0]?.[1] ?? 0) + ' visits';
+
+  const avg = Math.round(d.total.reduce((a, b) => a + b, 0) / d.total.length);
+  document.getElementById('stat-avg').textContent = fmtFull(avg);
+}
+
+function buildTotalChart(d) {
+  if (totalChart) totalChart.destroy();
+  const ctx = document.getElementById('totalChart').getContext('2d');
+  totalChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: d.dates.map(fmtDate),
+      datasets: [{
+        label: 'Total Visits',
+        data: d.total,
+        borderColor: '#6c63ff',
+        backgroundColor: 'rgba(108,99,255,0.12)',
+        borderWidth: 2.5,
+        fill: true,
+        tension: 0.35,
+        pointRadius: d.dates.length > 20 ? 0 : 4,
+        pointHoverRadius: 6,
+      }]
+    },
+    options: chartOptions('Total visits'),
+  });
+}
+
+function buildToggleRow(gameNames) {
+  const row = document.getElementById('toggleRow');
+  row.innerHTML = '';
+  gameNames.forEach((name, i) => {
+    const color = COLORS[i % COLORS.length];
+    const btn = document.createElement('div');
+    btn.className = 'game-toggle' + (hiddenGames.has(name) ? ' hidden' : '');
+    btn.innerHTML = `<span class="dot" style="background:${color}"></span>${name}`;
+    btn.addEventListener('click', () => {
+      if (hiddenGames.has(name)) hiddenGames.delete(name);
+      else hiddenGames.add(name);
+      render();
+    });
+    row.appendChild(btn);
+  });
+}
+
+function buildGamesChart(d) {
+  if (gamesChart) gamesChart.destroy();
+  const ctx = document.getElementById('gamesChart').getContext('2d');
+  const gameNames = Object.keys(d.games);
+
+  buildToggleRow(gameNames);
+
+  const datasets = gameNames
+    .filter(name => !hiddenGames.has(name))
+    .map((name, i) => {
+      const realIdx = gameNames.indexOf(name);
+      const color = COLORS[realIdx % COLORS.length];
+      return {
+        label: name,
+        data: d.games[name],
+        borderColor: color,
+        backgroundColor: color + '22',
+        borderWidth: 2,
+        fill: false,
+        tension: 0.35,
+        pointRadius: d.dates.length > 20 ? 0 : 3,
+        pointHoverRadius: 5,
+      };
+    });
+
+  gamesChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels: d.dates.map(fmtDate), datasets },
+    options: chartOptions(null),
+  });
+}
+
+function chartOptions(yLabel) {
+  return {
+    responsive: true,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a1d27',
+        borderColor: '#2e3248',
+        borderWidth: 1,
+        titleColor: '#e8eaf0',
+        bodyColor: '#7b82a0',
+        padding: 12,
+        callbacks: {
+          label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString()}`,
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: '#1e2235' },
+        ticks: { color: '#7b82a0', maxTicksLimit: 10, font: { size: 11 } },
+      },
+      y: {
+        grid: { color: '#1e2235' },
+        ticks: {
+          color: '#7b82a0',
+          font: { size: 11 },
+          callback: v => fmt(v),
+        },
+        title: yLabel ? { display: true, text: yLabel, color: '#7b82a0', font: { size: 11 } } : undefined,
+      }
+    }
+  };
+}
+
+function render() {
+  if (!allData) return;
+  const d = sliceData(allData);
+  updateStats(d);
+  buildTotalChart(d);
+  buildGamesChart(d);
+}
+
+// Date range buttons
+document.querySelectorAll('.range-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeDays = parseInt(btn.dataset.days);
+    render();
+  });
+});
+
+// Fetch data
+fetch('/api/visits')
+  .then(r => r.json())
+  .then(data => {
+    allData = data;
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+    render();
+  })
+  .catch(() => {
+    document.getElementById('loading').textContent = 'Failed to load data.';
+  });
+</script>
+
+</body>
+</html>
