@@ -157,6 +157,19 @@
     .wow-down { color: var(--red); font-weight: 500; }
     .wow-na { color: var(--muted); }
 
+    .game-select {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      outline: none;
+      appearance: auto;
+    }
+    .game-select:hover { border-color: var(--accent); }
+
     .loading { color: var(--muted); font-size: 14px; text-align: center; padding: 60px; }
 
     @media (max-width: 900px) {
@@ -281,8 +294,11 @@
         <div class="chart-header">
           <div>
             <div class="chart-title">Avg Visits by Day of Week</div>
-            <div class="chart-subtitle">All games · All-time average</div>
+            <div class="chart-subtitle" id="dowSubtitle">All games · All-time average</div>
           </div>
+          <select id="dowGameSelect" class="game-select">
+            <option value="__total__">All games</option>
+          </select>
         </div>
         <canvas id="dowChart"></canvas>
       </div>
@@ -494,12 +510,12 @@ function buildLeaderboard() {
   });
 }
 
-function buildDowChart() {
-  if (!statsData || !statsData.dow_avg) return;
+function buildDowChart(dowData) {
+  if (!dowData) return;
   if (dowChart) dowChart.destroy();
 
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const values = days.map(d => statsData.dow_avg[d] || 0);
+  const values = days.map(d => dowData[d] || 0);
   const max = Math.max(...values);
 
   const ctx = document.getElementById('dowChart').getContext('2d');
@@ -552,6 +568,28 @@ function buildDowChart() {
       }
     },
   });
+}
+
+function refreshDowChart() {
+  if (!statsData?.dow_avg) return;
+  const sel = document.getElementById('dowGameSelect').value;
+  const isTotal = sel === '__total__';
+  const dowData = isTotal ? statsData.dow_avg.total : statsData.dow_avg.games[sel];
+  document.getElementById('dowSubtitle').textContent =
+    isTotal ? 'All games · All-time average' : `${sel} · All-time average`;
+  buildDowChart(dowData);
+}
+
+function initDowSelect() {
+  const sel = document.getElementById('dowGameSelect');
+  // Populate with game names sorted alphabetically
+  Object.keys(statsData.dow_avg.games).sort().forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    sel.appendChild(opt);
+  });
+  sel.addEventListener('change', refreshDowChart);
 }
 
 function chartOptions(yLabel) {
@@ -642,7 +680,8 @@ Promise.all([
 
     render();
     buildLeaderboard();
-    buildDowChart();
+    initDowSelect();
+    refreshDowChart();
   })
   .catch(() => {
     document.getElementById('loading').textContent = 'Failed to load data.';

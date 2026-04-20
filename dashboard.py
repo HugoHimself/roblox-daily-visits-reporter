@@ -65,26 +65,36 @@ def get_avg_ccu_for_date(ccu_snapshots: dict, date_str: str) -> dict:
 
 
 def compute_dow_avg(snapshots: dict) -> dict:
-    """Returns avg total visits per day-of-week (Mon–Sun) across all history."""
+    """Returns avg visits per day-of-week for total and each game individually."""
     dates = sorted(snapshots.keys())
-    if len(dates) < 2:
-        return {}
+    day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    empty = {d: 0 for d in day_names}
 
-    dow_buckets: dict[int, list[int]] = {i: [] for i in range(7)}
+    if len(dates) < 2:
+        return {"total": empty, "games": {name: empty.copy() for name in GAMES}}
+
+    total_buckets: dict[int, list[int]] = {i: [] for i in range(7)}
+    game_buckets: dict[str, dict[int, list[int]]] = {
+        name: {i: [] for i in range(7)} for name in GAMES
+    }
 
     for i in range(1, len(dates)):
         prev = snapshots[dates[i - 1]]
         curr = snapshots[dates[i]]
-        day_total = sum(
-            max(0, curr.get(str(uid), 0) - prev.get(str(uid), 0))
-            for uid in GAMES.values()
-        )
-        dow_buckets[date.fromisoformat(dates[i]).weekday()].append(day_total)
+        dow = date.fromisoformat(dates[i]).weekday()
+        day_total = 0
+        for name, uid in GAMES.items():
+            delta = max(0, curr.get(str(uid), 0) - prev.get(str(uid), 0))
+            game_buckets[name][dow].append(delta)
+            day_total += delta
+        total_buckets[dow].append(day_total)
 
-    day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    def avg_dict(buckets: dict[int, list[int]]) -> dict[str, int]:
+        return {day_names[i]: round(sum(v) / len(v)) if v else 0 for i, v in buckets.items()}
+
     return {
-        day_names[i]: round(sum(v) / len(v)) if v else 0
-        for i, v in dow_buckets.items()
+        "total": avg_dict(total_buckets),
+        "games": {name: avg_dict(b) for name, b in game_buckets.items()},
     }
 
 
