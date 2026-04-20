@@ -4,15 +4,13 @@ Reads snapshot data from PostgreSQL (or local JSON fallback) and serves
 an interactive Chart.js dashboard.
 """
 
-import json
 import os
 from datetime import date, timedelta
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template
 
-# Reuse game config and data layer from main.py
-from main import GAMES, load_json, VISITS_FILE, CCU_FILE
+from main import GAMES, ACTIVE_CCU_THRESHOLD, load_json, VISITS_FILE, CCU_FILE
 
 app = Flask(__name__)
 
@@ -20,11 +18,11 @@ app = Flask(__name__)
 def compute_series(snapshots: dict) -> dict:
     """
     Given cumulative snapshots {date: {uid_str: int}},
-    returns daily visit deltas as a dict ready for Chart.js.
+    returns daily visit deltas + 7-day rolling average as a dict ready for Chart.js.
     """
     dates = sorted(snapshots.keys())
     if len(dates) < 2:
-        return {"dates": [], "games": {name: [] for name in GAMES}, "total": []}
+        return {"dates": [], "games": {name: [] for name in GAMES}, "total": [], "rolling_avg": []}
 
     result_dates = []
     games_data: dict[str, list[int]] = {name: [] for name in GAMES}
@@ -45,7 +43,37 @@ def compute_series(snapshots: dict) -> dict:
 
         total_data.append(day_total)
 
-    return {"dates": result_dates, "games": games_data, "total": total_data}
+    # 7-day trailing rolling average
+    rolling_avg = []
+    for i in range(len(total_data)):
+        start = max(0, i - 6)
+        rolling_avg.append(round(sum(total_data[start:i + 1]) / (i - start + 1)))
+
+    return {"dates": result_dates, "games": games_data, "total": total_data, "rolling_avg": rolling_avg}
+
+
+def compute_dow_avg(snapshots: dict) -> dict:
+    """Returns avg total visits per day-of-week (Mon–Sun) across all history."""
+    dates = sorted(snapshots.keys())
+    if len(dates) < 2:
+        return {}
+
+    dow_buckets: dict[int, list[int]] = {i: [] for i in range(7)}
+
+    for i in range(1, len(dates)):
+        prev = snapshots[dates[i - 1]]
+        curr = snapshots[dates[i]]
+        day_total = sum(
+            max(0, curr.get(str(uid), 0) - prev.get(str(uid), 0))
+            for uid in GAMES.values()
+        )
+        dow_buckets[date.fromisoformat(dates[i]).weekday()].append(day_total)
+
+    day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    return {
+        day_names[i]: round(sum(v) / len(v)) if v else 0
+        for i, v in dow_buckets.items()
+    }
 
 
 @app.route("/")
@@ -69,6 +97,78 @@ def api_ccu():
     latest_date = max(ccu_snapshots.keys())
     latest = ccu_snapshots[latest_date]
     return jsonify({name: latest.get(str(uid), 0) for name, uid in GAMES.items()})
+
+
+@app.route("/api/stats")
+def api_stats():
+    """Per-game table stats (yesterday, WoW%, 7d avg, CCU) + DOW averages + last-updated date."""
+    visit_snapshots = load_json(VISITS_FILE)
+    ccu_snapshots = load_json(CCU_FILE)
+
+    dates = sorted(visit_snapshots.keys())
+    last_updated = dates[-1] if dates else None
+
+    latest_ccu: dict = {}
+    if ccu_snapshots:
+        latest_ccu = ccu_snapshots.get(max(ccu_snapshots.keys()), {})
+
+    games_stats = []
+    for name, uid in GAMES.items():
+        uid_str = str(uid)
+        ccu = latest_ccu.get(uid_str, 0)
+        active = ccu >= ACTIVE_CCU_THRESHOLD
+
+        # Yesterday's visits
+        yesterday = None
+        if len(dates) >= 2:
+            yesterday = max(0,
+                visit_snapshots[dates[-1]].get(uid_str, 0) -
+                visit_snapshots[dates[-2]].get(uid_str, 0)
+            )
+
+        # WoW %: yesterday vs same weekday 7 days ago
+        wow_pct = None
+        if last_updated and yesterday is not None:
+            today_d = date.fromisoformat(last_updated)
+            wow_date = (today_d - timedelta(days=7)).isoformat()
+            wow_prev = (today_d - timedelta(days=8)).isoformat()
+            if wow_date in visit_snapshots and wow_prev in visit_snapshots:
+                wow_delta = max(0,
+                    visit_snapshots[wow_date].get(uid_str, 0) -
+                    visit_snapshots[wow_prev].get(uid_str, 0)
+                )
+                if wow_delta > 0:
+                    wow_pct = round((yesterday - wow_delta) / wow_delta * 100, 1)
+
+        # 7-day average (up to last 7 daily deltas)
+        avg_7d = None
+        if len(dates) >= 2:
+            recent = dates[-8:] if len(dates) >= 8 else dates
+            deltas = [
+                max(0,
+                    visit_snapshots[recent[i]].get(uid_str, 0) -
+                    visit_snapshots[recent[i - 1]].get(uid_str, 0))
+                for i in range(1, len(recent))
+            ]
+            if deltas:
+                avg_7d = round(sum(deltas) / len(deltas))
+
+        games_stats.append({
+            "name": name,
+            "yesterday": yesterday,
+            "wow_pct": wow_pct,
+            "avg_7d": avg_7d,
+            "ccu": ccu,
+            "active": active,
+        })
+
+    games_stats.sort(key=lambda x: x["yesterday"] or 0, reverse=True)
+
+    return jsonify({
+        "last_updated": last_updated,
+        "games": games_stats,
+        "dow_avg": compute_dow_avg(visit_snapshots),
+    })
 
 
 if __name__ == "__main__":
