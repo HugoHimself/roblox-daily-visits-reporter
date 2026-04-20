@@ -236,7 +236,8 @@ def _build_game_lines(
         grand_wow += wow_base or 0
         pct = wow_pct(visits, wow_base) if (visits is not None and wow_base is not None) else None
         visits_str = f"{visits:,} visits" if visits is not None else "N/A visits"
-        lines.append(f"  {name}: {visits_str} ({format_pct(pct, vs_label, wow_base)}) — {ccu:,} CCU")
+        trend = "🟢" if (pct is not None and pct > 0) else ("🔴" if (pct is not None and pct < 0) else "⚪")
+        lines.append(f"  {trend} {name}: {visits_str} ({format_pct(pct, vs_label, wow_base)}) — {ccu:,} CCU")
     return lines, grand_today, grand_wow
 
 
@@ -345,7 +346,8 @@ def build_weekly_message(
             g_week += this_week
             g_prev += prev_week or 0
             pct = wow_pct(this_week, prev_week) if prev_week else None
-            g_lines.append(f"  {name}: {this_week:,} visits ({format_pct(pct, 'prev week', prev_week)})")
+            trend = "🟢" if (pct is not None and pct > 0) else ("🔴" if (pct is not None and pct < 0) else "⚪")
+            g_lines.append(f"  {trend} {name}: {this_week:,} visits ({format_pct(pct, 'prev week', prev_week)})")
         return g_lines, g_week, g_prev
 
     # Active games in main message

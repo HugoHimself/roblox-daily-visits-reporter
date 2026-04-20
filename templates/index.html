@@ -18,6 +18,7 @@
       --accent: #6c63ff;
       --green: #22c55e;
       --red: #ef4444;
+      --amber: #f59e0b;
     }
 
     body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
@@ -37,6 +38,9 @@
     .logo-icon { font-size: 26px; }
     .logo-text { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
     .logo-sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+    .header-right { display: flex; align-items: center; gap: 16px; }
+    .last-updated { font-size: 12px; color: var(--muted); }
 
     .range-btns { display: flex; gap: 6px; }
     .range-btn {
@@ -80,6 +84,12 @@
     .chart-title { font-size: 15px; font-weight: 600; }
     .chart-subtitle { font-size: 12px; color: var(--muted); margin-top: 3px; }
 
+    /* Rolling avg legend */
+    .chart-legend { display: flex; gap: 16px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+    .legend-line { width: 20px; height: 2px; border-radius: 1px; }
+    .legend-line.dashed { background: repeating-linear-gradient(90deg, var(--amber) 0, var(--amber) 5px, transparent 5px, transparent 9px); }
+
     .toggle-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
     .game-toggle {
       display: flex;
@@ -100,11 +110,59 @@
 
     canvas { max-height: 340px; }
 
+    /* Leaderboard table */
+    .leaderboard-wrapper { overflow-x: auto; }
+    .leaderboard {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .leaderboard th {
+      text-align: left;
+      color: var(--muted);
+      font-weight: 500;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+    .leaderboard th:hover { color: var(--text); }
+    .leaderboard th.sorted { color: var(--accent); }
+    .leaderboard th .sort-arrow { margin-left: 4px; opacity: 0.5; }
+    .leaderboard th.sorted .sort-arrow { opacity: 1; }
+    .leaderboard th.num, .leaderboard td.num { text-align: right; }
+    .leaderboard td {
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .leaderboard tbody tr:last-child td { border-bottom: none; }
+    .leaderboard tbody tr:hover td { background: var(--surface2); }
+    .rank { color: var(--muted); font-size: 12px; width: 28px; }
+    .game-name { font-weight: 500; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .badge-active { background: rgba(34,197,94,0.15); color: var(--green); }
+    .badge-inactive { background: rgba(239,68,68,0.12); color: var(--red); }
+    .wow-up { color: var(--green); font-weight: 500; }
+    .wow-down { color: var(--red); font-weight: 500; }
+    .wow-na { color: var(--muted); }
+
     .loading { color: var(--muted); font-size: 14px; text-align: center; padding: 60px; }
 
     @media (max-width: 900px) {
       .stats-row { grid-template-columns: repeat(2, 1fr); }
-      header { flex-direction: column; gap: 12px; }
+      header { flex-direction: column; gap: 12px; align-items: flex-start; }
+      .header-right { width: 100%; justify-content: space-between; }
       main { padding: 16px; }
     }
   </style>
@@ -119,11 +177,14 @@
       <div class="logo-sub">Exclusible · Roblox Visit Analytics</div>
     </div>
   </div>
-  <div class="range-btns">
-    <button class="range-btn" data-days="7">7d</button>
-    <button class="range-btn" data-days="14">14d</button>
-    <button class="range-btn active" data-days="30">30d</button>
-    <button class="range-btn" data-days="0">All</button>
+  <div class="header-right">
+    <span class="last-updated" id="lastUpdated"></span>
+    <div class="range-btns">
+      <button class="range-btn" data-days="7">7d</button>
+      <button class="range-btn" data-days="14">14d</button>
+      <button class="range-btn active" data-days="30">30d</button>
+      <button class="range-btn" data-days="0">All</button>
+    </div>
   </div>
 </header>
 
@@ -156,16 +217,54 @@
 
     <div class="charts-grid">
 
+      <!-- Total visits + rolling avg -->
       <div class="chart-card">
         <div class="chart-header">
           <div>
             <div class="chart-title">Total Daily Visits</div>
             <div class="chart-subtitle">All games combined</div>
           </div>
+          <div class="chart-legend">
+            <div class="legend-item">
+              <div class="legend-line" style="background:#6c63ff;height:2.5px;"></div>
+              <span>Daily total</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-line dashed"></div>
+              <span>7d avg</span>
+            </div>
+          </div>
         </div>
         <canvas id="totalChart"></canvas>
       </div>
 
+      <!-- Game leaderboard -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Game Leaderboard</div>
+            <div class="chart-subtitle">Click a column header to sort</div>
+          </div>
+        </div>
+        <div class="leaderboard-wrapper">
+          <table class="leaderboard" id="leaderboardTable">
+            <thead>
+              <tr>
+                <th class="rank">#</th>
+                <th data-col="name">Game <span class="sort-arrow"></span></th>
+                <th data-col="active">Status <span class="sort-arrow"></span></th>
+                <th data-col="yesterday" class="num sorted">Yesterday <span class="sort-arrow">↓</span></th>
+                <th data-col="wow_pct" class="num">WoW % <span class="sort-arrow"></span></th>
+                <th data-col="avg_7d" class="num">7d Avg <span class="sort-arrow"></span></th>
+                <th data-col="ccu" class="num">Live CCU <span class="sort-arrow"></span></th>
+              </tr>
+            </thead>
+            <tbody id="leaderboardBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Per-game lines chart -->
       <div class="chart-card">
         <div class="chart-header">
           <div>
@@ -175,6 +274,17 @@
         </div>
         <div class="toggle-row" id="toggleRow"></div>
         <canvas id="gamesChart"></canvas>
+      </div>
+
+      <!-- Day-of-week bar chart -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Avg Visits by Day of Week</div>
+            <div class="chart-subtitle">All games · All-time average</div>
+          </div>
+        </div>
+        <canvas id="dowChart"></canvas>
       </div>
 
     </div>
@@ -190,10 +300,14 @@ const COLORS = [
 ];
 
 let allData = null;
+let statsData = null;
 let totalChart = null;
 let gamesChart = null;
+let dowChart = null;
 let activeDays = 30;
 let hiddenGames = new Set();
+let sortCol = 'yesterday';
+let sortAsc = false;
 
 function fmt(n) {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
@@ -214,6 +328,7 @@ function sliceData(data) {
   return {
     dates: data.dates.slice(-n),
     total: data.total.slice(-n),
+    rolling_avg: data.rolling_avg.slice(-n),
     games: Object.fromEntries(
       Object.entries(data.games).map(([k, v]) => [k, v.slice(-n)])
     ),
@@ -252,17 +367,33 @@ function buildTotalChart(d) {
     type: 'line',
     data: {
       labels: d.dates.map(fmtDate),
-      datasets: [{
-        label: 'Total Visits',
-        data: d.total,
-        borderColor: '#6c63ff',
-        backgroundColor: 'rgba(108,99,255,0.12)',
-        borderWidth: 2.5,
-        fill: true,
-        tension: 0.35,
-        pointRadius: d.dates.length > 20 ? 0 : 4,
-        pointHoverRadius: 6,
-      }]
+      datasets: [
+        {
+          label: 'Total Visits',
+          data: d.total,
+          borderColor: '#6c63ff',
+          backgroundColor: 'rgba(108,99,255,0.12)',
+          borderWidth: 2.5,
+          fill: true,
+          tension: 0.35,
+          pointRadius: d.dates.length > 20 ? 0 : 4,
+          pointHoverRadius: 6,
+          order: 2,
+        },
+        {
+          label: '7d Avg',
+          data: d.rolling_avg,
+          borderColor: '#f59e0b',
+          backgroundColor: 'transparent',
+          borderWidth: 1.5,
+          borderDash: [5, 4],
+          fill: false,
+          tension: 0.35,
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          order: 1,
+        },
+      ]
     },
     options: chartOptions('Total visits'),
   });
@@ -317,6 +448,112 @@ function buildGamesChart(d) {
   });
 }
 
+function buildLeaderboard() {
+  if (!statsData) return;
+
+  const games = [...statsData.games];
+
+  // Sort
+  games.sort((a, b) => {
+    let av = a[sortCol], bv = b[sortCol];
+    // nulls last
+    if (av === null || av === undefined) return 1;
+    if (bv === null || bv === undefined) return -1;
+    if (typeof av === 'string') return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+    if (sortCol === 'active') { av = av ? 1 : 0; bv = bv ? 1 : 0; }
+    return sortAsc ? av - bv : bv - av;
+  });
+
+  // Update header arrows
+  document.querySelectorAll('.leaderboard th[data-col]').forEach(th => {
+    const col = th.dataset.col;
+    const arrow = th.querySelector('.sort-arrow');
+    th.classList.toggle('sorted', col === sortCol);
+    arrow.textContent = col === sortCol ? (sortAsc ? '↑' : '↓') : '';
+  });
+
+  const tbody = document.getElementById('leaderboardBody');
+  tbody.innerHTML = '';
+
+  games.forEach((g, i) => {
+    const wowHtml = g.wow_pct === null
+      ? '<span class="wow-na">N/A</span>'
+      : `<span class="${g.wow_pct >= 0 ? 'wow-up' : 'wow-down'}">${g.wow_pct >= 0 ? '+' : ''}${g.wow_pct}%</span>`;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="rank">${i + 1}</td>
+      <td class="game-name">${g.name}</td>
+      <td><span class="badge ${g.active ? 'badge-active' : 'badge-inactive'}">${g.active ? 'Active' : 'Inactive'}</span></td>
+      <td class="num">${g.yesterday !== null ? fmtFull(g.yesterday) : '—'}</td>
+      <td class="num">${wowHtml}</td>
+      <td class="num">${g.avg_7d !== null ? fmtFull(g.avg_7d) : '—'}</td>
+      <td class="num">${fmtFull(g.ccu)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function buildDowChart() {
+  if (!statsData || !statsData.dow_avg) return;
+  if (dowChart) dowChart.destroy();
+
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const values = days.map(d => statsData.dow_avg[d] || 0);
+  const max = Math.max(...values);
+
+  const ctx = document.getElementById('dowChart').getContext('2d');
+  dowChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: days,
+      datasets: [{
+        label: 'Avg Visits',
+        data: values,
+        backgroundColor: values.map(v =>
+          v === max ? 'rgba(108,99,255,0.85)' : 'rgba(108,99,255,0.35)'
+        ),
+        borderColor: values.map(v =>
+          v === max ? '#6c63ff' : 'rgba(108,99,255,0.5)'
+        ),
+        borderWidth: 1,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1a1d27',
+          borderColor: '#2e3248',
+          borderWidth: 1,
+          titleColor: '#e8eaf0',
+          bodyColor: '#7b82a0',
+          padding: 12,
+          callbacks: {
+            label: ctx => ` ${ctx.parsed.y.toLocaleString()} avg visits`,
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: '#7b82a0', font: { size: 12 } },
+        },
+        y: {
+          grid: { color: '#1e2235' },
+          ticks: {
+            color: '#7b82a0',
+            font: { size: 11 },
+            callback: v => fmt(v),
+          },
+        }
+      }
+    },
+  });
+}
+
 function chartOptions(yLabel) {
   return {
     responsive: true,
@@ -361,6 +598,20 @@ function render() {
   buildGamesChart(d);
 }
 
+// Sortable leaderboard headers
+document.querySelectorAll('.leaderboard th[data-col]').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.col;
+    if (sortCol === col) {
+      sortAsc = !sortAsc;
+    } else {
+      sortCol = col;
+      sortAsc = false;
+    }
+    buildLeaderboard();
+  });
+});
+
 // Date range buttons
 document.querySelectorAll('.range-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -371,14 +622,27 @@ document.querySelectorAll('.range-btn').forEach(btn => {
   });
 });
 
-// Fetch data
-fetch('/api/visits')
-  .then(r => r.json())
-  .then(data => {
-    allData = data;
+// Fetch both APIs in parallel
+Promise.all([
+  fetch('/api/visits').then(r => r.json()),
+  fetch('/api/stats').then(r => r.json()),
+])
+  .then(([visits, stats]) => {
+    allData = visits;
+    statsData = stats;
+
+    // Last updated
+    if (stats.last_updated) {
+      const d = fmtDate(stats.last_updated);
+      document.getElementById('lastUpdated').textContent = `Updated ${d}`;
+    }
+
     document.getElementById('loading').style.display = 'none';
     document.getElementById('content').style.display = 'block';
+
     render();
+    buildLeaderboard();
+    buildDowChart();
   })
   .catch(() => {
     document.getElementById('loading').textContent = 'Failed to load data.';
