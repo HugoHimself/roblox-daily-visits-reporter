@@ -10,7 +10,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, render_template
 
-from main import GAMES, ACTIVE_CCU_THRESHOLD, load_json, VISITS_FILE, CCU_FILE
+from main import GAMES, ACTIVE_CCU_THRESHOLD, load_json, VISITS_FILE, CCU_FILE, get_latest_ccu_for_date
 
 app = Flask(__name__)
 
@@ -50,6 +50,18 @@ def compute_series(snapshots: dict) -> dict:
         rolling_avg.append(round(sum(total_data[start:i + 1]) / (i - start + 1)))
 
     return {"dates": result_dates, "games": games_data, "total": total_data, "rolling_avg": rolling_avg}
+
+
+def get_avg_ccu_for_date(ccu_snapshots: dict, date_str: str) -> dict:
+    """Average all CCU snapshots (possibly multiple per day) for a given date."""
+    day_snaps = [v for k, v in ccu_snapshots.items() if k[:10] == date_str]
+    if not day_snaps:
+        return {}
+    uid_strs = set().union(*(s.keys() for s in day_snaps))
+    return {
+        uid_str: round(sum(s.get(uid_str, 0) for s in day_snaps) / len(day_snaps))
+        for uid_str in uid_strs
+    }
 
 
 def compute_dow_avg(snapshots: dict) -> dict:
@@ -94,8 +106,8 @@ def api_ccu():
     ccu_snapshots = load_json(CCU_FILE)
     if not ccu_snapshots:
         return jsonify({})
-    latest_date = max(ccu_snapshots.keys())
-    latest = ccu_snapshots[latest_date]
+    today_str = date.today().isoformat()
+    latest = get_latest_ccu_for_date(ccu_snapshots, today_str) or ccu_snapshots[max(ccu_snapshots.keys())]
     return jsonify({name: latest.get(str(uid), 0) for name, uid in GAMES.items()})
 
 
@@ -108,14 +120,17 @@ def api_stats():
     dates = sorted(visit_snapshots.keys())
     last_updated = dates[-1] if dates else None
 
-    latest_ccu: dict = {}
-    if ccu_snapshots:
-        latest_ccu = ccu_snapshots.get(max(ccu_snapshots.keys()), {})
+    # Avg CCU for yesterday (from all intra-day snapshots)
+    yesterday_str = (date.fromisoformat(last_updated) - timedelta(days=1)).isoformat() if last_updated else None
+    avg_ccu = get_avg_ccu_for_date(ccu_snapshots, yesterday_str) if yesterday_str else {}
+    # Fall back to latest available snapshot if no yesterday data yet
+    if not avg_ccu and ccu_snapshots:
+        avg_ccu = get_latest_ccu_for_date(ccu_snapshots, last_updated) if last_updated else {}
 
     games_stats = []
     for name, uid in GAMES.items():
         uid_str = str(uid)
-        ccu = latest_ccu.get(uid_str, 0)
+        ccu = avg_ccu.get(uid_str, 0)
         active = ccu >= ACTIVE_CCU_THRESHOLD
 
         # Yesterday's visits

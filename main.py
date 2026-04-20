@@ -14,7 +14,7 @@ import argparse
 import json
 import os
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import requests
@@ -183,6 +183,17 @@ def trend_arrow(pct: float | None) -> str:
     if pct < 0:
         return "↓"
     return "→"
+
+
+def ccu_snapshot_key() -> str:
+    """UTC datetime key used for CCU snapshots, e.g. '2026-04-20T08:00'."""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M")
+
+
+def get_latest_ccu_for_date(ccu_snapshots: dict, date_str: str) -> dict:
+    """Return the most recent CCU snapshot for a given date."""
+    keys = [k for k in ccu_snapshots if k[:10] == date_str]
+    return ccu_snapshots[max(keys)] if keys else {}
 
 
 def format_millions(n: int) -> str:
@@ -421,7 +432,19 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Post Roblox visit stats to Slack.")
     parser.add_argument("--dry-run", action="store_true", help="Print instead of posting.")
     parser.add_argument("--weekly", action="store_true", help="Post the weekly summary.")
+    parser.add_argument("--ccu-snapshot", action="store_true", help="Store a CCU snapshot only (no Slack).")
     args = parser.parse_args()
+
+    # CCU-only snapshot mode (runs every 4 hours)
+    if args.ccu_snapshot:
+        key = ccu_snapshot_key()
+        print(f"Fetching CCU snapshot ({key})...")
+        _, ccu_today = fetch_game_data()
+        ccu_snapshots = load_json(CCU_FILE)
+        ccu_snapshots[key] = ccu_today
+        save_json(CCU_FILE, ccu_snapshots)
+        print(f"CCU snapshot saved: {len(ccu_today)} games.")
+        return
 
     today = date.today()
     today_str = today.isoformat()
@@ -438,14 +461,14 @@ def main() -> None:
         print(f"Fetching Roblox data ({today_str})...")
         visits_today, ccu_today = fetch_game_data()
         visit_snapshots[today_str] = visits_today
-        ccu_snapshots[today_str] = ccu_today
+        ccu_snapshots[ccu_snapshot_key()] = ccu_today
         save_json(VISITS_FILE, visit_snapshots)
         save_json(CCU_FILE, ccu_snapshots)
         print("Snapshots saved.")
     else:
         print(f"Snapshot for {today_str} already exists, skipping fetch.")
 
-    today_ccu = ccu_snapshots.get(today_str, {})
+    today_ccu = get_latest_ccu_for_date(ccu_snapshots, today_str)
 
     # --- Weekly mode ---
     if args.weekly:
