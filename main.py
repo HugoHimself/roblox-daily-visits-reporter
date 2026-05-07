@@ -64,6 +64,7 @@ ROBLOX_API_URL = "https://games.roblox.com/v1/games"
 SLACK_CHANNEL_ID = "C03CZ9EB538"
 VISITS_FILE = Path(__file__).parent / "data" / "visits.json"
 CCU_FILE = Path(__file__).parent / "data" / "ccu.json"
+POSTED_FILE = Path(__file__).parent / "data" / "posted.json"
 
 ACTIVE_CCU_THRESHOLD = 35
 
@@ -115,6 +116,37 @@ def save_json(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w") as f:
         json.dump(data, f, indent=2, sort_keys=True)
+
+
+# ---------------------------------------------------------------------------
+# Duplicate-post guard
+# ---------------------------------------------------------------------------
+
+def _load_posted() -> dict:
+    """Always reads from local file, regardless of DATABASE_URL."""
+    if POSTED_FILE.exists():
+        with POSTED_FILE.open() as f:
+            return json.load(f)
+    return {}
+
+
+def _save_posted(data: dict) -> None:
+    """Always writes to local file, regardless of DATABASE_URL."""
+    POSTED_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with POSTED_FILE.open("w") as f:
+        json.dump(data, f, indent=2, sort_keys=True)
+
+
+def already_posted_today(mode: str = "daily") -> bool:
+    """Returns True if a Slack post for this mode was already made today."""
+    return _load_posted().get(mode) == date.today().isoformat()
+
+
+def mark_posted_today(mode: str = "daily") -> None:
+    """Record that today's Slack post for this mode has been sent."""
+    posted = _load_posted()
+    posted[mode] = date.today().isoformat()
+    _save_posted(posted)
 
 
 # ---------------------------------------------------------------------------
@@ -435,7 +467,7 @@ def main() -> None:
     parser.add_argument("--ccu-snapshot", action="store_true", help="Store a CCU snapshot only (no Slack).")
     args = parser.parse_args()
 
-    # CCU-only snapshot mode (runs every 4 hours)
+    # CCU-only snapshot mode — no Slack, no duplicate guard needed
     if args.ccu_snapshot:
         key = ccu_snapshot_key()
         print(f"Fetching CCU snapshot ({key})...")
@@ -491,6 +523,8 @@ def main() -> None:
 
     main_message, thread_message = message
 
+    post_mode = "weekly" if args.weekly else "daily"
+
     if args.dry_run:
         sys.stdout.buffer.write(b"\n--- DRY RUN (main) ---\n")
         sys.stdout.buffer.write(main_message.encode("utf-8") + b"\n")
@@ -499,9 +533,18 @@ def main() -> None:
             sys.stdout.buffer.write(thread_message.encode("utf-8") + b"\n")
         sys.stdout.buffer.write(b"--- END ---\n\n")
     else:
+        # Only the production environment (Render, with DATABASE_URL) is allowed
+        # to publish to Slack. Local runs would post duplicates without WoW history.
+        if not DATABASE_URL:
+            print("DATABASE_URL not set — local run, skipping Slack post (production cron handles it).")
+            return
+        if already_posted_today(post_mode):
+            print(f"Already posted {post_mode} report today ({date.today()}) — skipping.")
+            return
         ts = post_to_slack(main_message)
         if thread_message:
             post_to_slack(thread_message, thread_ts=ts)
+        mark_posted_today(post_mode)
         print("Message posted to Slack successfully.")
 
 
