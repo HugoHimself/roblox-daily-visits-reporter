@@ -104,6 +104,11 @@ def load_json(path: Path) -> dict:
 
 
 def save_json(path: Path, data: dict) -> None:
+    # Always write to local file — serves as a real-time backup regardless of env
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w") as f:
+        json.dump(data, f, indent=2, sort_keys=True)
+    # Also persist to PostgreSQL when running in production
     if DATABASE_URL:
         key = path.stem
         with _db_conn() as conn, conn.cursor() as cur:
@@ -112,10 +117,6 @@ def save_json(path: Path, data: dict) -> None:
                 INSERT INTO snapshots (key, data) VALUES (%s, %s)
                 ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data
             """, (key, json.dumps(data)))
-        return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w") as f:
-        json.dump(data, f, indent=2, sort_keys=True)
 
 
 # ---------------------------------------------------------------------------
@@ -289,22 +290,33 @@ def build_daily_message(
     yesterday_visits: dict[str, int],
     wow_visits: dict[str, int] | None,
     today_ccu: dict[str, int],
+    gap_days: int = 1,
 ) -> tuple[str, str | None]:
     """Returns (main_message, thread_message).
     main_message contains Active games + total.
     thread_message contains Non-Active games (None if empty).
+    gap_days > 1 means there was a snapshot gap; visits cover multiple days.
     """
     vs_label = f"last {WEEKDAY_SHORT[yesterday.weekday()]}"
-    date_label = yesterday.strftime("%A, %B ") + str(yesterday.day)
     categories = categorize_games(today_ccu)
 
     # --- Main message: Active games + Total ---
-    weekday_full = yesterday.strftime("%A")
-    lines = [
-        f"📊 Roblox Daily Visits — {date_label}",
-        f"Here are the active visits we got on {weekday_full}. Non-active games are in thread. 🧵",
-        "",
-    ]
+    if gap_days > 1:
+        today = yesterday + timedelta(days=gap_days)
+        date_range = f"{yesterday.strftime('%b %d')} → {today.strftime('%b %d')}"
+        lines = [
+            f"📊 Roblox Visits — {date_range} ({gap_days}d catch-up)",
+            f"Visits accumulated over {gap_days} days (snapshot gap). Non-active games in thread. 🧵",
+            "",
+        ]
+    else:
+        date_label = yesterday.strftime("%A, %B ") + str(yesterday.day)
+        weekday_full = yesterday.strftime("%A")
+        lines = [
+            f"📊 Roblox Daily Visits — {date_label}",
+            f"Here are the active visits we got on {weekday_full}. Non-active games are in thread. 🧵",
+            "",
+        ]
     active_lines, grand_today, grand_wow = _build_game_lines(
         categories["Active"], yesterday_visits, wow_visits, today_ccu, vs_label
     )
@@ -510,16 +522,27 @@ def main() -> None:
         message = result
     else:
         # --- Daily mode ---
-        yesterday_visits = get_visit_delta(visit_snapshots, today_str, yesterday_str)
-        if yesterday_visits is None:
-            print("No yesterday snapshot — first run. Visits will show as N/A.")
+        dates_sorted = sorted(visit_snapshots.keys())
+        past_dates = [d for d in dates_sorted if d < today_str]
+
+        if past_dates:
+            prev_date_str = past_dates[-1]
+            prev_date = date.fromisoformat(prev_date_str)
+            gap_days = (today - prev_date).days
+            yesterday_visits = get_visit_delta(visit_snapshots, today_str, prev_date_str) or {}
+            if gap_days > 1:
+                print(f"Snapshot gap detected: {gap_days} days since last snapshot ({prev_date_str}).")
+        else:
+            prev_date = today - timedelta(days=1)
+            gap_days = 1
             yesterday_visits = {}
+            print("No previous snapshot — first run. Visits will show as N/A.")
 
         wow_visits = get_visit_delta(visit_snapshots, wow_date_str, wow_prev_date_str)
         if wow_visits is None:
             print("Not enough historical data for WoW comparison — will show N/A.")
 
-        message = build_daily_message(today - timedelta(days=1), yesterday_visits, wow_visits, today_ccu)
+        message = build_daily_message(prev_date, yesterday_visits, wow_visits, today_ccu, gap_days=gap_days)
 
     main_message, thread_message = message
 
@@ -533,11 +556,6 @@ def main() -> None:
             sys.stdout.buffer.write(thread_message.encode("utf-8") + b"\n")
         sys.stdout.buffer.write(b"--- END ---\n\n")
     else:
-        # Only the production environment (Render, with DATABASE_URL) is allowed
-        # to publish to Slack. Local runs would post duplicates without WoW history.
-        if not DATABASE_URL:
-            print("DATABASE_URL not set — local run, skipping Slack post (production cron handles it).")
-            return
         if already_posted_today(post_mode):
             print(f"Already posted {post_mode} report today ({date.today()}) — skipping.")
             return
