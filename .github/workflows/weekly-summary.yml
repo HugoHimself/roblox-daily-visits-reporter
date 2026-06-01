@@ -1,0 +1,47 @@
+name: Weekly Summary
+
+on:
+  schedule:
+    # 08:05 UTC every Monday (5 min after the daily run to avoid a push race)
+    - cron: "5 8 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: roblox-data-write
+  cancel-in-progress: false
+
+jobs:
+  weekly:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Post weekly summary to Slack
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        run: python main.py --weekly
+
+      - name: Commit updated snapshots
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --staged --quiet; then
+            echo "No data changes to commit."
+          else
+            git commit -m "data: weekly snapshot $(date -u +%Y-%m-%d)"
+            git pull --rebase --autostash origin ${{ github.ref_name }}
+            git push
+          fi

@@ -1,0 +1,48 @@
+name: Daily Visits Report
+
+on:
+  schedule:
+    # 08:00 UTC every day
+    - cron: "0 8 * * *"
+  workflow_dispatch: {}   # allow manual "Run workflow" button
+
+# Allow the workflow to commit updated snapshot data back to the repo
+permissions:
+  contents: write
+
+concurrency:
+  group: roblox-data-write
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Post daily visits to Slack
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        run: python main.py
+
+      - name: Commit updated snapshots
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --staged --quiet; then
+            echo "No data changes to commit."
+          else
+            git commit -m "data: daily snapshot $(date -u +%Y-%m-%d)"
+            git pull --rebase --autostash origin ${{ github.ref_name }}
+            git push
+          fi

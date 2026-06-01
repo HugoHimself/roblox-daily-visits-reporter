@@ -9,8 +9,14 @@ env/
 # Environment variables
 .env
 
-# Data — snapshots stored in PostgreSQL on Render; local files only
-data/
+# Data — visit/ccu snapshot JSON files are tracked in git for persistence +
+# backup (used by the GitHub Actions automation).
+# posted.json is the duplicate-post guard and stays local to each environment.
+data/posted.json
+data/*.tmp
+
+# Local Claude / IDE config
+.claude/
 
 # OS
 .DS_Store

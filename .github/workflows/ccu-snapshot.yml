@@ -1,0 +1,45 @@
+name: CCU Snapshot
+
+on:
+  schedule:
+    # Every 4 hours, offset by 10 min so it never collides with the 08:00 daily run
+    - cron: "10 */4 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: roblox-data-write
+  cancel-in-progress: false
+
+jobs:
+  ccu:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Capture CCU snapshot (no Slack)
+        run: python main.py --ccu-snapshot
+
+      - name: Commit updated snapshots
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --staged --quiet; then
+            echo "No data changes to commit."
+          else
+            git commit -m "data: ccu snapshot $(date -u +%Y-%m-%dT%H:%M)"
+            git pull --rebase --autostash origin ${{ github.ref_name }}
+            git push
+          fi

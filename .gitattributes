@@ -1,0 +1,5 @@
+# Force LF for files that run on Linux (GitHub Actions runners)
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.sh    text eol=lf
+*.py    text eol=lf
