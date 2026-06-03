@@ -69,6 +69,7 @@ VISITS_FILE = Path(__file__).parent / "data" / "visits.json"
 CCU_FILE = Path(__file__).parent / "data" / "ccu.json"
 POSTED_FILE = Path(__file__).parent / "data" / "posted.json"
 MILESTONES_FILE = Path(__file__).parent / "data" / "milestones.json"
+EXTRA_FILE = Path(__file__).parent / "data" / "extra_games.json"
 
 ACTIVE_CCU_THRESHOLD = 35
 
@@ -121,6 +122,20 @@ def save_json(path: Path, data: dict) -> None:
                 INSERT INTO snapshots (key, data) VALUES (%s, %s)
                 ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data
             """, (key, json.dumps(data)))
+
+
+def load_extra_games() -> dict:
+    """Manually-tracked games that aren't on the live Roblox feed (Decentraland /
+    Sandbox activations, small pop-ups, or Roblox games without a known universe
+    ID). Seeded from the bundled data/extra_games.json, then editable via the
+    dashboard. Returns {id: {name, visits, rating, avg_session_min}}."""
+    data = load_json(EXTRA_FILE)
+    if data:
+        return data
+    if EXTRA_FILE.exists():
+        with EXTRA_FILE.open() as f:
+            return json.load(f)
+    return {}
 
 
 # ---------------------------------------------------------------------------
@@ -517,8 +532,12 @@ def post_to_slack(message: str, thread_ts: str | None = None) -> str:
 # Milestones
 # ---------------------------------------------------------------------------
 
-def _names_by_uid() -> dict[str, str]:
-    return {str(uid): name for name, uid in GAMES.items()}
+def _all_names() -> dict[str, str]:
+    """Game id -> display name for both live (universe id) and manual games."""
+    names = {str(uid): name for name, uid in GAMES.items()}
+    for gid, g in load_extra_games().items():
+        names[gid] = g.get("name", gid)
+    return names
 
 
 def check_and_post_milestones(
@@ -534,7 +553,7 @@ def check_and_post_milestones(
     """
     state = load_json(MILESTONES_FILE)
     now_iso = datetime.now(timezone.utc).isoformat()
-    alerts, new_state = milestones.check(visits, ccu, _names_by_uid(), state, now_iso)
+    alerts, new_state = milestones.check(visits, ccu, _all_names(), state, now_iso)
 
     if not alerts:
         save_json(MILESTONES_FILE, new_state)
@@ -587,6 +606,11 @@ def main() -> None:
     if args.check_milestones:
         print("Checking milestones...")
         visits_now, ccu_now = fetch_game_data()
+        # Fold manual/static games into the total so portfolio milestones match
+        # the dashboard (these are static, so they never fire per-game alerts).
+        for gid, g in load_extra_games().items():
+            if g.get("visits") is not None:
+                visits_now[gid] = g["visits"]
         check_and_post_milestones(visits_now, ccu_now, dry_run=args.dry_run)
         return
 

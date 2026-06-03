@@ -1,0 +1,194 @@
+{
+  "x_american_supermarket_simulator": {
+    "avg_session_min": null,
+    "name": "American Supermarket Simulator",
+    "rating": null,
+    "visits": 95800
+  },
+  "x_anime_demon_survival": {
+    "avg_session_min": 4.5,
+    "name": "Anime Demon Survival",
+    "rating": null,
+    "visits": 80800
+  },
+  "x_boss_immersive_show": {
+    "avg_session_min": 12,
+    "name": "Boss Immersive Show",
+    "rating": null,
+    "visits": 76500
+  },
+  "x_build_my_city": {
+    "avg_session_min": null,
+    "name": "Build My City",
+    "rating": null,
+    "visits": 345500
+  },
+  "x_color_catch": {
+    "avg_session_min": null,
+    "name": "Color Catch",
+    "rating": null,
+    "visits": 355100
+  },
+  "x_coty_campus_hub": {
+    "avg_session_min": null,
+    "name": "COTY Campus Hub",
+    "rating": null,
+    "visits": 2700
+  },
+  "x_coty_sally_hansen": {
+    "avg_session_min": null,
+    "name": "COTY Sally Hansen",
+    "rating": null,
+    "visits": 1500
+  },
+  "x_creator_avatar_editor": {
+    "avg_session_min": 1.2,
+    "name": "Creator Avatar Editor",
+    "rating": null,
+    "visits": 26400
+  },
+  "x_credit_agricole": {
+    "avg_session_min": null,
+    "name": "Credit Agricole",
+    "rating": null,
+    "visits": 116
+  },
+  "x_deloitte": {
+    "avg_session_min": null,
+    "name": "Deloitte",
+    "rating": null,
+    "visits": 322
+  },
+  "x_dfw": {
+    "avg_session_min": null,
+    "name": "DFW",
+    "rating": null,
+    "visits": 8200
+  },
+  "x_diac": {
+    "avg_session_min": null,
+    "name": "DIAC",
+    "rating": null,
+    "visits": 300
+  },
+  "x_dubai_boat_show": {
+    "avg_session_min": null,
+    "name": "Dubai International Boat Show",
+    "rating": null,
+    "visits": 2800
+  },
+  "x_exclusible_codes": {
+    "avg_session_min": null,
+    "name": "Exclusible Codes",
+    "rating": null,
+    "visits": 58500
+  },
+  "x_get_there_fall_guys_obby": {
+    "avg_session_min": null,
+    "name": "Get There + Fall Guys Obby",
+    "rating": null,
+    "visits": 18000
+  },
+  "x_hogan_decentraland_dance": {
+    "avg_session_min": null,
+    "name": "Hogan Decentraland Dance Compet",
+    "rating": null,
+    "visits": 11000
+  },
+  "x_legacy_glow_up_elf": {
+    "avg_session_min": 8,
+    "name": "[LEGACY] Glow Up by E.L.F Cosmetics",
+    "rating": null,
+    "visits": 74700
+  },
+  "x_makeup_store_simulator": {
+    "avg_session_min": null,
+    "name": "Makeup Store Simulator",
+    "rating": null,
+    "visits": 731
+  },
+  "x_mbw_decentraland": {
+    "avg_session_min": null,
+    "name": "MBW Decentraland",
+    "rating": null,
+    "visits": 3000
+  },
+  "x_mbw_spatial": {
+    "avg_session_min": null,
+    "name": "MBW Spatial",
+    "rating": null,
+    "visits": 14500
+  },
+  "x_my_bff_closet": {
+    "avg_session_min": 7.2,
+    "name": "My BFF Closet",
+    "rating": 80,
+    "visits": 349110
+  },
+  "x_my_candy_factory": {
+    "avg_session_min": null,
+    "name": "My Candy Factory",
+    "rating": null,
+    "visits": 275200
+  },
+  "x_palace_season_2_sandbox": {
+    "avg_session_min": 8,
+    "name": "Palace Season 2 - The Sandbox",
+    "rating": null,
+    "visits": 56400
+  },
+  "x_penthouses": {
+    "avg_session_min": 10,
+    "name": "Penthouses",
+    "rating": null,
+    "visits": 115000
+  },
+  "x_pirate_training": {
+    "avg_session_min": 6.9,
+    "name": "Pirate Training",
+    "rating": null,
+    "visits": 124282
+  },
+  "x_push_them_off": {
+    "avg_session_min": null,
+    "name": "Push Them Off",
+    "rating": null,
+    "visits": 135600
+  },
+  "x_raise_a_cat": {
+    "avg_session_min": 10,
+    "name": "Raise a Cat",
+    "rating": 86,
+    "visits": 371901
+  },
+  "x_superstar_mansion_tycoon": {
+    "avg_session_min": 7.8,
+    "name": "Superstar Mansion Tycoon",
+    "rating": 90.78,
+    "visits": 11630000
+  },
+  "x_tapping_league_x": {
+    "avg_session_min": 6.7,
+    "name": "Tapping League X",
+    "rating": 93.3,
+    "visits": 1890730
+  },
+  "x_tapping_masters": {
+    "avg_session_min": 8.7,
+    "name": "Tapping Masters",
+    "rating": 95.84,
+    "visits": 1357000
+  },
+  "x_tractor_training": {
+    "avg_session_min": 10.1,
+    "name": "Tractor Training",
+    "rating": null,
+    "visits": 134000
+  },
+  "x_unbox_a_brainrot_shop": {
+    "avg_session_min": null,
+    "name": "Unbox a Brainrot Shop",
+    "rating": null,
+    "visits": 103100
+  }
+}

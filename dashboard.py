@@ -16,6 +16,7 @@ import milestones as ms
 from main import (
     GAMES, ACTIVE_CCU_THRESHOLD, load_json, save_json, VISITS_FILE, CCU_FILE,
     get_latest_ccu_for_date, fetch_live_stats, fetch_votes,
+    load_extra_games, EXTRA_FILE,
 )
 
 app = Flask(__name__)
@@ -163,60 +164,71 @@ def trends():
     return render_template("index.html")
 
 
+def _game_row(gid, name, source, visits, ccu, rating, avg_min, available, editable, rungs):
+    """Build a single portfolio row (shared by live + manual games)."""
+    hours = round(visits * avg_min / 60) if (visits and avg_min) else None
+    cur_rung = ms.highest_rung_at_or_below(visits or 0, rungs)
+    nxt = ms.next_rung(cur_rung, rungs)
+    progress = None
+    if nxt is not None and visits is not None:
+        base = cur_rung or 0
+        progress = round((visits - base) / (nxt - base) * 100, 1)
+    return {
+        "id": gid, "uid": gid, "name": name, "source": source,
+        "visits": visits, "ccu": ccu, "rating": rating,
+        "avg_session_min": avg_min, "total_hours": hours,
+        "available": available, "editable": editable,
+        "next_milestone": nxt, "progress": progress,
+    }
+
+
 @app.route("/api/portfolio")
 def api_portfolio():
-    """Live cumulative stats per game + portfolio totals + milestone progress."""
+    """Live + manual cumulative stats per game, portfolio totals, milestone progress."""
     live = get_live()
     manual = load_manual()
+    extra = load_extra_games()
     rungs = ms.visit_rungs()
 
     games = []
-    total_visits = 0
-    total_ccu = 0
-    total_hours = 0
-    up_sum = 0
-    down_sum = 0
 
+    # --- Live games (auto from Roblox) ---
     for name, uid in GAMES.items():
         us = str(uid)
         v = live["visits"].get(us)
-        ccu = live["ccu"].get(us, 0)
-
         vote = live["votes"].get(us)
         rating = None
         if vote and (vote["up"] + vote["down"]) > 0:
             rating = round(vote["up"] / (vote["up"] + vote["down"]) * 100, 1)
-            up_sum += vote["up"]
-            down_sum += vote["down"]
-
         avg_min = (manual.get(us) or {}).get("avg_session_min")
-        hours = None
-        if v is not None and avg_min:
-            hours = round(v * avg_min / 60)
-            total_hours += hours
+        games.append(_game_row(
+            us, name, "live", v, live["ccu"].get(us, 0), rating, avg_min,
+            available=v is not None, editable=["avg_session_min"], rungs=rungs,
+        ))
 
-        if v is not None:
-            total_visits += v
-        total_ccu += ccu
+    # --- Manual games (entered by hand, seeded from the sheet) ---
+    for gid, g in extra.items():
+        v = g.get("visits")
+        games.append(_game_row(
+            gid, g.get("name", gid), "manual", v, None, g.get("rating"),
+            g.get("avg_session_min"), available=v is not None,
+            editable=["visits", "rating", "avg_session_min"], rungs=rungs,
+        ))
 
-        cur_rung = ms.highest_rung_at_or_below(v or 0, rungs)
-        nxt = ms.next_rung(cur_rung, rungs)
-        progress = None
-        if nxt is not None and v is not None:
-            base = cur_rung or 0
-            progress = round((v - base) / (nxt - base) * 100, 1)
-
-        games.append({
-            "name": name, "uid": us, "visits": v, "ccu": ccu, "rating": rating,
-            "avg_session_min": avg_min, "total_hours": hours,
-            "available": v is not None, "next_milestone": nxt, "progress": progress,
-        })
-
-    games.sort(key=lambda g: g["visits"] or 0, reverse=True)
+    # --- Totals across every game ---
+    total_visits = sum(g["visits"] or 0 for g in games)
+    total_ccu = sum(g["ccu"] or 0 for g in games)
+    total_hours = sum(g["total_hours"] or 0 for g in games)
     for g in games:
         g["pct"] = round(g["visits"] / total_visits * 100, 1) if (g["visits"] and total_visits) else 0
+    games.sort(key=lambda g: g["visits"] or 0, reverse=True)
 
-    weighted_rating = round(up_sum / (up_sum + down_sum) * 100, 1) if (up_sum + down_sum) else None
+    # Visits-weighted rating: a game's rating counts in proportion to its visits,
+    # so Hunted (120M) weighs far more than Glow Up (9M). Simple mean kept for ref.
+    rated = [(g["rating"], g["visits"]) for g in games if g["rating"] is not None and g["visits"]]
+    weighted_rating = round(sum(r * v for r, v in rated) / sum(v for _, v in rated), 1) if rated else None
+    simple_rating = round(sum(r for r, _ in rated) / len(rated), 1) if rated else None
+
     cur_total = ms.total_milestone_at_or_below(total_visits)
     next_total = (cur_total + ms.TOTAL_STEP) if cur_total is not None else ms.TOTAL_STEP
     total_progress = round((total_visits - (cur_total or 0)) / ms.TOTAL_STEP * 100, 1)
@@ -225,35 +237,60 @@ def api_portfolio():
         "games": games,
         "totals": {
             "visits": total_visits, "ccu": total_ccu, "hours": total_hours,
-            "rating": weighted_rating, "next_milestone": next_total,
-            "progress": total_progress, "count": len(games),
+            "rating": weighted_rating, "rating_simple": simple_rating,
+            "next_milestone": next_total, "progress": total_progress,
+            "count": len(games), "rated_count": len(rated),
         },
         "live": live["live"],
     })
 
 
-@app.route("/api/manual", methods=["POST"])
-def api_manual():
-    """Update one game's manually-entered avg session minutes."""
+@app.route("/api/edit", methods=["POST"])
+def api_edit():
+    """Edit a manual field. Live games: avg_session_min only. Manual games:
+    visits, rating, avg_session_min. Body: {id, field, value}."""
     payload = request.get_json(force=True, silent=True) or {}
-    uid = str(payload.get("uid", "")).strip()
-    if not uid:
-        return jsonify({"error": "uid required"}), 400
+    gid = str(payload.get("id", "")).strip()
+    field = str(payload.get("field", "")).strip()
+    raw = payload.get("value")
+    if not gid:
+        return jsonify({"error": "id required"}), 400
 
-    val = payload.get("avg_session_min")
-    manual = load_manual()
-    entry = dict(manual.get(uid, {}))
-    if val in (None, "", False):
-        entry.pop("avg_session_min", None)
+    live_ids = {str(u) for u in GAMES.values()}
+    is_live = gid in live_ids
+    allowed = {"avg_session_min"} if is_live else {"visits", "rating", "avg_session_min"}
+    if field not in allowed:
+        return jsonify({"error": f"field '{field}' is not editable for this game"}), 400
+
+    # Empty clears the value; otherwise parse as a number.
+    if raw in (None, "", False):
+        value = None
     else:
         try:
-            entry["avg_session_min"] = float(val)
+            value = float(raw)
         except (TypeError, ValueError):
             return jsonify({"error": "invalid number"}), 400
-    manual[uid] = entry
-    save_json(MANUAL_FILE, manual)
+        if field == "visits":
+            value = int(value)
+
+    if is_live:
+        manual = load_manual()
+        entry = dict(manual.get(gid, {}))
+        if value is None:
+            entry.pop(field, None)
+        else:
+            entry[field] = value
+        manual[gid] = entry
+        save_json(MANUAL_FILE, manual)
+    else:
+        extra = load_extra_games()
+        if gid not in extra:
+            return jsonify({"error": "unknown game"}), 404
+        extra[gid][field] = value
+        save_json(EXTRA_FILE, extra)
+
     _live_cache["ts"] = 0.0  # bust cache so totals recompute on next load
-    return jsonify({"ok": True, "uid": uid, "avg_session_min": entry.get("avg_session_min")})
+    return jsonify({"ok": True, "id": gid, "field": field, "value": value})
 
 
 @app.route("/api/visits")
