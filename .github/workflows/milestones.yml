@@ -1,0 +1,48 @@
+name: Milestone Alerts
+
+on:
+  schedule:
+    # Every hour, offset by 20 min so it never collides with the daily/ccu runs
+    - cron: "20 * * * *"
+  workflow_dispatch: {}   # allow manual "Run workflow" button
+
+# Allow the workflow to commit updated milestone state back to the repo
+permissions:
+  contents: write
+
+concurrency:
+  group: roblox-data-write
+  cancel-in-progress: false
+
+jobs:
+  milestones:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check milestones and post any alerts to Slack
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        run: python main.py --check-milestones
+
+      - name: Commit updated milestone state
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --staged --quiet; then
+            echo "No milestone state changes to commit."
+          else
+            git commit -m "data: milestone state $(date -u +%Y-%m-%dT%H:%M)"
+            git pull --rebase --autostash origin ${{ github.ref_name }}
+            git push
+          fi

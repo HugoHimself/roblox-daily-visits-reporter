@@ -19,6 +19,8 @@ from pathlib import Path
 
 import requests
 
+import milestones
+
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 # Load .env file if present (no extra dependency needed)
@@ -61,10 +63,12 @@ GAMES: dict[str, int] = {
 # Constants
 # ---------------------------------------------------------------------------
 ROBLOX_API_URL = "https://games.roblox.com/v1/games"
+ROBLOX_VOTES_URL = "https://games.roblox.com/v1/games/votes"
 SLACK_CHANNEL_ID = "C03CZ9EB538"
 VISITS_FILE = Path(__file__).parent / "data" / "visits.json"
 CCU_FILE = Path(__file__).parent / "data" / "ccu.json"
 POSTED_FILE = Path(__file__).parent / "data" / "posted.json"
+MILESTONES_FILE = Path(__file__).parent / "data" / "milestones.json"
 
 ACTIVE_CCU_THRESHOLD = 35
 
@@ -178,6 +182,47 @@ def fetch_game_data() -> tuple[dict[str, int], dict[str, int]]:
         visits[uid_str] = item["visits"]
         ccu[uid_str] = item["playing"]
 
+    return visits, ccu
+
+
+def fetch_votes() -> dict[str, dict[str, int]]:
+    """Returns {uid_str: {'up': upVotes, 'down': downVotes}} for all GAMES.
+
+    Used by the dashboard for live like-ratings. Returns {} on failure
+    (ratings are non-critical) rather than aborting.
+    """
+    ids = ",".join(str(uid) for uid in GAMES.values())
+    try:
+        resp = requests.get(ROBLOX_VOTES_URL, params={"universeIds": ids}, timeout=15)
+        resp.raise_for_status()
+    except requests.RequestException as e:
+        print(f"[WARN] Roblox votes request failed: {e}", file=sys.stderr)
+        return {}
+    out: dict[str, dict[str, int]] = {}
+    for item in resp.json().get("data", []):
+        out[str(item["id"])] = {
+            "up": item.get("upVotes", 0),
+            "down": item.get("downVotes", 0),
+        }
+    return out
+
+
+def fetch_live_stats() -> tuple[dict[str, int], dict[str, int]]:
+    """Like fetch_game_data() but RAISES on error instead of sys.exit().
+
+    Safe for the web dashboard, where exiting would kill the gunicorn worker.
+    Callers should catch requests.RequestException.
+    """
+    ids = ",".join(str(uid) for uid in GAMES.values())
+    resp = requests.get(ROBLOX_API_URL, params={"universeIds": ids}, timeout=15)
+    resp.raise_for_status()
+    payload = resp.json()
+    visits: dict[str, int] = {}
+    ccu: dict[str, int] = {}
+    for item in payload.get("data", []):
+        uid_str = str(item["id"])
+        visits[uid_str] = item["visits"]
+        ccu[uid_str] = item["playing"]
     return visits, ccu
 
 
@@ -469,6 +514,53 @@ def post_to_slack(message: str, thread_ts: str | None = None) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Milestones
+# ---------------------------------------------------------------------------
+
+def _names_by_uid() -> dict[str, str]:
+    return {str(uid): name for name, uid in GAMES.items()}
+
+
+def check_and_post_milestones(
+    visits: dict[str, int],
+    ccu: dict[str, int],
+    dry_run: bool = False,
+) -> list[str]:
+    """Evaluate milestones against fresh data, persist state, post any alerts.
+
+    State-based de-duplication means each milestone fires exactly once, so this
+    is safe to run as often as you like (hourly cron by default). The very
+    first run only seeds a baseline — it never posts historical milestones.
+    """
+    state = load_json(MILESTONES_FILE)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    alerts, new_state = milestones.check(visits, ccu, _names_by_uid(), state, now_iso)
+
+    if not alerts:
+        save_json(MILESTONES_FILE, new_state)
+        print("No new milestones.")
+        return []
+
+    body = "📢 *Milestone update*\n" + "\n".join(alerts)
+
+    if dry_run:
+        save_json(MILESTONES_FILE, new_state)
+        sys.stdout.buffer.write(b"\n--- DRY RUN (milestones) ---\n")
+        sys.stdout.buffer.write(body.encode("utf-8") + b"\n--- END ---\n\n")
+        return alerts
+
+    if not os.environ.get("SLACK_BOT_TOKEN"):
+        print(f"[WARN] {len(alerts)} milestone(s) found but SLACK_BOT_TOKEN is not "
+              f"set — not posting (will retry next run):\n{body}", file=sys.stderr)
+        return alerts  # don't advance state, so the alert isn't silently lost
+
+    post_to_slack(body)
+    save_json(MILESTONES_FILE, new_state)
+    print(f"Posted {len(alerts)} milestone alert(s) to Slack.")
+    return alerts
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -477,6 +569,7 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", help="Print instead of posting.")
     parser.add_argument("--weekly", action="store_true", help="Post the weekly summary.")
     parser.add_argument("--ccu-snapshot", action="store_true", help="Store a CCU snapshot only (no Slack).")
+    parser.add_argument("--check-milestones", action="store_true", help="Check for milestones and post alerts to Slack.")
     args = parser.parse_args()
 
     # CCU-only snapshot mode — no Slack, no duplicate guard needed
@@ -488,6 +581,13 @@ def main() -> None:
         ccu_snapshots[key] = ccu_today
         save_json(CCU_FILE, ccu_snapshots)
         print(f"CCU snapshot saved: {len(ccu_today)} games.")
+        return
+
+    # Milestone-check mode — fetch fresh data, post any newly-crossed milestones
+    if args.check_milestones:
+        print("Checking milestones...")
+        visits_now, ccu_now = fetch_game_data()
+        check_and_post_milestones(visits_now, ccu_now, dry_run=args.dry_run)
         return
 
     today = date.today()

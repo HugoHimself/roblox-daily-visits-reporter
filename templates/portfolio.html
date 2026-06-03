@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Live Board · Buddy's Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3248;
+      --text: #e8eaf0;
+      --muted: #7b82a0;
+      --accent: #6c63ff;
+      --green: #22c55e;
+      --red: #ef4444;
+      --amber: #f59e0b;
+    }
+
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 32px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 10;
+    }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-icon { font-size: 26px; }
+    .logo-text { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+    .logo-sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+    nav.tabs { display: flex; gap: 4px; margin-left: 28px; }
+    nav.tabs a {
+      color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 500;
+      padding: 7px 14px; border-radius: 7px; transition: all .15s;
+    }
+    nav.tabs a:hover { color: var(--text); background: var(--surface2); }
+    nav.tabs a.active { color: #fff; background: var(--accent); }
+
+    .header-right { display: flex; align-items: center; gap: 14px; }
+    .live-pill {
+      display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted);
+      background: var(--surface2); border: 1px solid var(--border); padding: 6px 12px; border-radius: 20px;
+    }
+    .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 0 rgba(34,197,94,0.6); animation: pulse 2s infinite; }
+    .live-dot.stale { background: var(--amber); animation: none; }
+    @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(34,197,94,0.5)} 70%{box-shadow:0 0 0 7px rgba(34,197,94,0)} 100%{box-shadow:0 0 0 0 rgba(34,197,94,0)} }
+    .refresh-btn {
+      background: var(--surface2); border: 1px solid var(--border); color: var(--muted);
+      padding: 6px 12px; border-radius: 7px; font-size: 13px; cursor: pointer; transition: all .15s;
+    }
+    .refresh-btn:hover { color: var(--text); border-color: var(--accent); }
+
+    main { max-width: 1480px; margin: 0 auto; padding: 26px 32px 60px; }
+
+    .stats-row { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 18px; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 22px; }
+    .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px; display:flex; align-items:center; gap:6px; }
+    .stat-value { font-size: 30px; font-weight: 700; letter-spacing: -0.6px; font-variant-numeric: tabular-nums; }
+    .stat-sub { font-size: 12px; color: var(--muted); margin-top: 5px; }
+    .stat-accent { color: var(--accent); }
+    .stat-green { color: var(--green); }
+
+    /* milestone progress bar inside the total card */
+    .ms-bar-wrap { margin-top: 12px; }
+    .ms-bar-track { height: 7px; background: var(--surface2); border-radius: 5px; overflow: hidden; }
+    .ms-bar-fill { height: 100%; background: linear-gradient(90deg, #6c63ff, #22c55e); border-radius: 5px; transition: width .6s ease; }
+    .ms-bar-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+    .board-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 6px 6px 8px; }
+    .board-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px 12px; }
+    .board-title { font-size: 15px; font-weight: 600; }
+    .board-subtitle { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+    .table-wrap { overflow-x: auto; }
+    table.board { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table.board th {
+      text-align: right; color: var(--muted); font-weight: 500; padding: 9px 14px;
+      border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase;
+      letter-spacing: 0.5px; white-space: nowrap; position: sticky; top: 0; background: var(--surface);
+    }
+    table.board th.left { text-align: left; }
+    table.board td { padding: 0; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    table.board td .cell { padding: 10px 14px; text-align: right; font-variant-numeric: tabular-nums; }
+    table.board td .cell.left { text-align: left; }
+    table.board tbody tr:hover td { outline: 1px solid rgba(108,99,255,0.25); outline-offset: -1px; }
+    table.board tbody tr.unavailable { opacity: 0.55; }
+    .rank { color: var(--muted); font-size: 12px; width: 30px; text-align: right; padding-right: 6px !important; }
+    .gname { font-weight: 600; }
+    .gname .warn { color: var(--amber); font-size: 11px; font-weight: 500; margin-left: 6px; }
+
+    .sess-input {
+      width: 64px; background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+      padding: 5px 8px; border-radius: 6px; font-size: 13px; text-align: right; outline: none;
+      font-variant-numeric: tabular-nums;
+    }
+    .sess-input:hover { border-color: var(--accent); }
+    .sess-input:focus { border-color: var(--accent); background: #1c2030; }
+    .sess-empty { color: var(--muted); }
+
+    .rating-pill { display: inline-block; padding: 3px 9px; border-radius: 11px; font-weight: 600; font-size: 12px; }
+
+    /* per-row next-milestone mini bar */
+    .mini { display: flex; flex-direction: column; gap: 4px; min-width: 130px; }
+    .mini-top { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
+    .mini-track { height: 5px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+    .mini-fill { height: 100%; background: var(--accent); border-radius: 4px; }
+
+    .loading { color: var(--muted); font-size: 14px; text-align: center; padding: 80px; }
+    .foot { color: var(--muted); font-size: 12px; margin-top: 16px; line-height: 1.6; }
+    .foot b { color: var(--text); }
+
+    @media (max-width: 1000px) {
+      .stats-row { grid-template-columns: 1fr 1fr; }
+      header { flex-wrap: wrap; gap: 10px; }
+      nav.tabs { margin-left: 0; }
+      main { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="logo-icon">🎮</span>
+    <div>
+      <div class="logo-text">Buddy's Dashboard</div>
+      <div class="logo-sub">Exclusible · Live Roblox Portfolio</div>
+    </div>
+    <nav class="tabs">
+      <a href="/" class="active">● Live Board</a>
+      <a href="/trends">Trends</a>
+    </nav>
+  </div>
+  <div class="header-right">
+    <div class="live-pill"><span class="live-dot" id="liveDot"></span><span id="liveLabel">Live</span></div>
+    <button class="refresh-btn" id="refreshBtn">↻ Refresh</button>
+  </div>
+</header>
+
+<main>
+  <div id="loading" class="loading">Fetching live data from Roblox…</div>
+
+  <div id="content" style="display:none">
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">📈 Total Visits <span style="color:var(--muted)">· all tracked games</span></div>
+        <div class="stat-value" id="totVisits">—</div>
+        <div class="ms-bar-wrap">
+          <div class="ms-bar-track"><div class="ms-bar-fill" id="msFill" style="width:0%"></div></div>
+          <div class="ms-bar-label"><span id="msLeft">—</span><span id="msRight">next milestone</span></div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">🟢 Players Online Now</div>
+        <div class="stat-value stat-green" id="totCcu">—</div>
+        <div class="stat-sub" id="ccuSub">live concurrent players</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">⏱️ Total Hours Played</div>
+        <div class="stat-value" id="totHours">—</div>
+        <div class="stat-sub">visits × avg session (editable)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">⭐ Portfolio Rating</div>
+        <div class="stat-value" id="totRating">—</div>
+        <div class="stat-sub">like-rating, weighted by votes</div>
+      </div>
+    </div>
+
+    <div class="board-card">
+      <div class="board-head">
+        <div>
+          <div class="board-title">Game Portfolio</div>
+          <div class="board-subtitle">Visits, players &amp; ratings are live from Roblox · session time is editable &amp; saved</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="board">
+          <thead>
+            <tr>
+              <th class="rank">#</th>
+              <th class="left">Game</th>
+              <th>Total Visits</th>
+              <th>% Share</th>
+              <th>Players Now</th>
+              <th>Avg Session (min)</th>
+              <th>Total Hours</th>
+              <th>Rating</th>
+              <th class="left">Next Milestone</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="foot" id="foot"></div>
+  </div>
+</main>
+
+<script>
+const fmtFull = n => (n == null ? '—' : Number(n).toLocaleString('en-US'));
+function fmt(n) {
+  if (n == null) return '—';
+  if (n >= 1_000_000) { const m = n/1_000_000; return (m>=100? m.toFixed(0): m.toFixed(1)) + 'M'; }
+  if (n >= 1_000) return (n/1000).toFixed(n>=100000?0:1) + 'K';
+  return Number(n).toLocaleString('en-US');
+}
+function fmtShort(n) {
+  if (n == null) return '—';
+  if (n >= 1_000_000) { const m = n/1_000_000; const s = (Math.round(m*100)/100).toString(); return s + 'M'; }
+  if (n >= 1_000) return Math.round(n/1000) + 'K';
+  return String(n);
+}
+
+// Heatmap helpers — alpha scales with magnitude (sqrt for a gentler ramp)
+function heatGreen(t) { const a = 0.06 + 0.40 * Math.sqrt(Math.max(0, Math.min(1, t))); return `rgba(34,197,94,${a.toFixed(3)})`; }
+function heatBlue(t)  { const a = 0.06 + 0.40 * Math.sqrt(Math.max(0, Math.min(1, t))); return `rgba(108,99,255,${a.toFixed(3)})`; }
+function ratingColor(r) {
+  if (r == null) return { bg: 'transparent', fg: 'var(--muted)' };
+  if (r >= 95) return { bg: 'rgba(34,197,94,0.18)', fg: '#4ade80' };
+  if (r >= 90) return { bg: 'rgba(34,197,94,0.12)', fg: '#86efac' };
+  if (r >= 80) return { bg: 'rgba(245,158,11,0.15)', fg: '#fbbf24' };
+  return { bg: 'rgba(239,68,68,0.15)', fg: '#f87171' };
+}
+
+let refreshTimer = null;
+
+async function loadPortfolio() {
+  // Don't yank the table out from under someone editing a session cell
+  if (document.activeElement && document.activeElement.classList.contains('sess-input')) return;
+  try {
+    const res = await fetch('/api/portfolio');
+    const d = await res.json();
+    render(d);
+  } catch (e) {
+    document.getElementById('loading').textContent = 'Could not reach the server.';
+  }
+}
+
+function render(d) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('content').style.display = 'block';
+
+  const t = d.totals;
+  document.getElementById('totVisits').textContent = fmtFull(t.visits);
+  document.getElementById('totCcu').textContent = fmtFull(t.ccu);
+  document.getElementById('ccuSub').textContent = `across ${t.count} games · live`;
+  document.getElementById('totHours').textContent = fmt(t.hours);
+  document.getElementById('totRating').textContent = t.rating == null ? '—' : t.rating + '%';
+
+  // portfolio milestone progress
+  const prevRung = (t.next_milestone || 0) - 25_000_000;
+  const pct = Math.max(0, Math.min(100, t.progress ?? 0));
+  document.getElementById('msFill').style.width = pct + '%';
+  const toGo = (t.next_milestone || 0) - t.visits;
+  document.getElementById('msLeft').textContent = `${pct.toFixed(1)}% to ${fmtShort(t.next_milestone)}`;
+  document.getElementById('msRight').textContent = toGo > 0 ? `${fmtFull(toGo)} to go` : '';
+
+  // live/stale indicator
+  const dot = document.getElementById('liveDot'), lbl = document.getElementById('liveLabel');
+  if (d.live) { dot.classList.remove('stale'); lbl.textContent = 'Live'; }
+  else { dot.classList.add('stale'); lbl.textContent = 'Last snapshot'; }
+
+  // column maxima for heatmap scaling
+  const maxV = Math.max(...d.games.map(g => g.visits || 0), 1);
+  const maxPct = Math.max(...d.games.map(g => g.pct || 0), 1);
+  const maxCcu = Math.max(...d.games.map(g => g.ccu || 0), 1);
+  const maxHours = Math.max(...d.games.map(g => g.total_hours || 0), 1);
+
+  const rows = document.getElementById('rows');
+  rows.innerHTML = '';
+  d.games.forEach((g, i) => {
+    const tr = document.createElement('tr');
+    if (!g.available) tr.className = 'unavailable';
+
+    const rc = ratingColor(g.rating);
+    const sessVal = g.avg_session_min != null ? g.avg_session_min : '';
+    const miniPct = g.progress == null ? 0 : Math.max(0, Math.min(100, g.progress));
+    const nextLabel = g.next_milestone ? fmtShort(g.next_milestone) : '—';
+    const warn = g.available ? '' : `<span class="warn" title="This universe ID returns no data — the game may be private or removed. Update its ID in main.py.">⚠ ID needs fixing</span>`;
+
+    tr.innerHTML = `
+      <td class="rank">${i + 1}</td>
+      <td><div class="cell left gname">${g.name}${warn}</div></td>
+      <td style="background:${g.visits ? heatGreen((g.visits)/maxV) : 'transparent'}"><div class="cell">${fmtFull(g.visits)}</div></td>
+      <td style="background:${g.pct ? heatGreen(g.pct/maxPct) : 'transparent'}"><div class="cell">${g.pct ? g.pct + '%' : '—'}</div></td>
+      <td style="background:${g.ccu ? heatBlue(g.ccu/maxCcu) : 'transparent'}"><div class="cell">${fmtFull(g.ccu)}</div></td>
+      <td><div class="cell"><input class="sess-input ${sessVal===''?'sess-empty':''}" type="number" step="0.1" min="0" value="${sessVal}" data-uid="${g.uid}" placeholder="—" /></div></td>
+      <td style="background:${g.total_hours ? heatGreen(g.total_hours/maxHours) : 'transparent'}"><div class="cell">${g.total_hours != null ? fmt(g.total_hours) : '—'}</div></td>
+      <td><div class="cell"><span class="rating-pill" style="background:${rc.bg};color:${rc.fg}">${g.rating != null ? g.rating + '%' : '—'}</span></div></td>
+      <td><div class="cell left"><div class="mini">
+        <div class="mini-top"><span>→ ${nextLabel}</span><span>${g.progress != null ? miniPct.toFixed(0)+'%' : ''}</span></div>
+        <div class="mini-track"><div class="mini-fill" style="width:${miniPct}%"></div></div>
+      </div></div></td>
+    `;
+    rows.appendChild(tr);
+  });
+
+  // wire session-time editing
+  rows.querySelectorAll('.sess-input').forEach(inp => {
+    inp.addEventListener('change', async () => {
+      const uid = inp.dataset.uid;
+      const val = inp.value === '' ? null : parseFloat(inp.value);
+      inp.disabled = true;
+      try {
+        await fetch('/api/manual', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uid, avg_session_min: val }),
+        });
+        await loadPortfolio();  // recompute hours + totals
+      } finally { inp.disabled = false; }
+    });
+  });
+
+  const ago = new Date().toLocaleTimeString('en-GB');
+  document.getElementById('foot').innerHTML =
+    `Visits, concurrent players and ratings pull live from Roblox's public API (cached ~60s). ` +
+    `Session time is entered by you and saved. Hours = visits × avg session ÷ 60. ` +
+    `Milestone alerts post to Slack automatically. <br>Last updated <b>${ago}</b>` +
+    (d.live ? '' : ' · ⚠️ Roblox API was unreachable, showing the last saved snapshot.');
+}
+
+document.getElementById('refreshBtn').addEventListener('click', loadPortfolio);
+
+loadPortfolio();
+refreshTimer = setInterval(loadPortfolio, 60_000);
+</script>
+
+</body>
+</html>

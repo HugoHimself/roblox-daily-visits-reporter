@@ -4,15 +4,68 @@ Reads snapshot data from PostgreSQL (or local JSON fallback) and serves
 an interactive Chart.js dashboard.
 """
 
+import json
 import os
+import time
 from datetime import date, timedelta
 from pathlib import Path
 
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 
-from main import GAMES, ACTIVE_CCU_THRESHOLD, load_json, VISITS_FILE, CCU_FILE, get_latest_ccu_for_date
+import milestones as ms
+from main import (
+    GAMES, ACTIVE_CCU_THRESHOLD, load_json, save_json, VISITS_FILE, CCU_FILE,
+    get_latest_ccu_for_date, fetch_live_stats, fetch_votes,
+)
 
 app = Flask(__name__)
+
+MANUAL_FILE = Path(__file__).parent / "data" / "manual.json"
+
+# Short-lived cache so rapid board refreshes don't hammer the Roblox API.
+_live_cache: dict = {"ts": 0.0, "data": None}
+LIVE_TTL_SECONDS = 60
+
+
+def load_manual() -> dict:
+    """Manual session-time data: Postgres/local store, seeded from the bundled
+    data/manual.json the first time (when the prod DB is still empty)."""
+    data = load_json(MANUAL_FILE)
+    if data:
+        return data
+    if MANUAL_FILE.exists():
+        with MANUAL_FILE.open() as f:
+            return json.load(f)
+    return {}
+
+
+def get_live() -> dict:
+    """Current visits/CCU/votes for all games (cached ~60s). Falls back to the
+    latest stored snapshot if Roblox is unreachable, so the board always renders."""
+    now = time.time()
+    cached = _live_cache["data"]
+    if cached and now - _live_cache["ts"] < LIVE_TTL_SECONDS:
+        return cached
+
+    live = True
+    try:
+        visits, ccu = fetch_live_stats()
+    except Exception:
+        live = False
+        visit_snapshots = load_json(VISITS_FILE)
+        ccu_snapshots = load_json(CCU_FILE)
+        visits = visit_snapshots[max(visit_snapshots)] if visit_snapshots else {}
+        ccu = (get_latest_ccu_for_date(ccu_snapshots, max(ccu_snapshots)[:10])
+               if ccu_snapshots else {})
+
+    try:
+        votes = fetch_votes()
+    except Exception:
+        votes = {}
+
+    data = {"visits": visits, "ccu": ccu, "votes": votes, "live": live, "fetched": now}
+    _live_cache.update(ts=now, data=data)
+    return data
 
 
 def compute_series(snapshots: dict) -> dict:
@@ -100,7 +153,107 @@ def compute_dow_avg(snapshots: dict) -> dict:
 
 @app.route("/")
 def index():
+    """Live portfolio board — the spreadsheet-style view."""
+    return render_template("portfolio.html")
+
+
+@app.route("/trends")
+def trends():
+    """Historical trends dashboard (daily deltas, WoW, day-of-week)."""
     return render_template("index.html")
+
+
+@app.route("/api/portfolio")
+def api_portfolio():
+    """Live cumulative stats per game + portfolio totals + milestone progress."""
+    live = get_live()
+    manual = load_manual()
+    rungs = ms.visit_rungs()
+
+    games = []
+    total_visits = 0
+    total_ccu = 0
+    total_hours = 0
+    up_sum = 0
+    down_sum = 0
+
+    for name, uid in GAMES.items():
+        us = str(uid)
+        v = live["visits"].get(us)
+        ccu = live["ccu"].get(us, 0)
+
+        vote = live["votes"].get(us)
+        rating = None
+        if vote and (vote["up"] + vote["down"]) > 0:
+            rating = round(vote["up"] / (vote["up"] + vote["down"]) * 100, 1)
+            up_sum += vote["up"]
+            down_sum += vote["down"]
+
+        avg_min = (manual.get(us) or {}).get("avg_session_min")
+        hours = None
+        if v is not None and avg_min:
+            hours = round(v * avg_min / 60)
+            total_hours += hours
+
+        if v is not None:
+            total_visits += v
+        total_ccu += ccu
+
+        cur_rung = ms.highest_rung_at_or_below(v or 0, rungs)
+        nxt = ms.next_rung(cur_rung, rungs)
+        progress = None
+        if nxt is not None and v is not None:
+            base = cur_rung or 0
+            progress = round((v - base) / (nxt - base) * 100, 1)
+
+        games.append({
+            "name": name, "uid": us, "visits": v, "ccu": ccu, "rating": rating,
+            "avg_session_min": avg_min, "total_hours": hours,
+            "available": v is not None, "next_milestone": nxt, "progress": progress,
+        })
+
+    games.sort(key=lambda g: g["visits"] or 0, reverse=True)
+    for g in games:
+        g["pct"] = round(g["visits"] / total_visits * 100, 1) if (g["visits"] and total_visits) else 0
+
+    weighted_rating = round(up_sum / (up_sum + down_sum) * 100, 1) if (up_sum + down_sum) else None
+    cur_total = ms.total_milestone_at_or_below(total_visits)
+    next_total = (cur_total + ms.TOTAL_STEP) if cur_total is not None else ms.TOTAL_STEP
+    total_progress = round((total_visits - (cur_total or 0)) / ms.TOTAL_STEP * 100, 1)
+
+    return jsonify({
+        "games": games,
+        "totals": {
+            "visits": total_visits, "ccu": total_ccu, "hours": total_hours,
+            "rating": weighted_rating, "next_milestone": next_total,
+            "progress": total_progress, "count": len(games),
+        },
+        "live": live["live"],
+    })
+
+
+@app.route("/api/manual", methods=["POST"])
+def api_manual():
+    """Update one game's manually-entered avg session minutes."""
+    payload = request.get_json(force=True, silent=True) or {}
+    uid = str(payload.get("uid", "")).strip()
+    if not uid:
+        return jsonify({"error": "uid required"}), 400
+
+    val = payload.get("avg_session_min")
+    manual = load_manual()
+    entry = dict(manual.get(uid, {}))
+    if val in (None, "", False):
+        entry.pop("avg_session_min", None)
+    else:
+        try:
+            entry["avg_session_min"] = float(val)
+        except (TypeError, ValueError):
+            return jsonify({"error": "invalid number"}), 400
+    manual[uid] = entry
+    save_json(MANUAL_FILE, manual)
+    _live_cache["ts"] = 0.0  # bust cache so totals recompute on next load
+    return jsonify({"ok": True, "uid": uid, "avg_session_min": entry.get("avg_session_min")})
 
 
 @app.route("/api/visits")
