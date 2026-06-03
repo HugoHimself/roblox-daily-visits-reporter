@@ -1,0 +1,88 @@
+{
+  "games": {
+    "5988568657": {
+      "ccu_peak": 132,
+      "visits_rung": 20000000
+    },
+    "6906503978": {
+      "ccu_peak": 12,
+      "visits_rung": 1000000
+    },
+    "6981432181": {},
+    "7229780065": {
+      "ccu_peak": 1401,
+      "visits_rung": 120000000
+    },
+    "7306273010": {
+      "ccu_peak": 10,
+      "visits_rung": 1000000
+    },
+    "7436965994": {
+      "ccu_peak": 62,
+      "visits_rung": 10000000
+    },
+    "7448978668": {
+      "ccu_peak": 0,
+      "visits_rung": null
+    },
+    "7475643372": {
+      "ccu_peak": 0,
+      "visits_rung": 1000000
+    },
+    "7486728492": {
+      "ccu_peak": 394,
+      "visits_rung": 20000000
+    },
+    "7552570368": {
+      "ccu_peak": 0,
+      "visits_rung": null
+    },
+    "7737898405": {
+      "ccu_peak": 10,
+      "visits_rung": 1000000
+    },
+    "8738763254": {
+      "ccu_peak": 67,
+      "visits_rung": 20000000
+    },
+    "8804313953": {
+      "ccu_peak": 2,
+      "visits_rung": null
+    },
+    "9054548108": {
+      "ccu_peak": 2288,
+      "visits_rung": 10000000
+    },
+    "9328305853": {
+      "ccu_peak": 446,
+      "visits_rung": 20000000
+    },
+    "9368056464": {
+      "ccu_peak": 100,
+      "visits_rung": 5000000
+    },
+    "9550290526": {
+      "ccu_peak": 0,
+      "visits_rung": null
+    },
+    "9674557095": {
+      "ccu_peak": 0,
+      "visits_rung": null
+    },
+    "9710205604": {
+      "ccu_peak": 1627,
+      "visits_rung": 10000000
+    },
+    "9713686345": {
+      "ccu_peak": 2,
+      "visits_rung": null
+    },
+    "9803070785": {
+      "ccu_peak": 13,
+      "visits_rung": 1000000
+    }
+  },
+  "initialized": true,
+  "last_checked": "2026-06-03T22:21:58.540381+00:00",
+  "total_rung": 275000000
+}
