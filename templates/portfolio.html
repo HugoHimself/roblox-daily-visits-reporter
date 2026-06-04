@@ -4,123 +4,106 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Live Board · Buddy's Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --bg: #0f1117;
-      --surface: #1a1d27;
-      --surface2: #22263a;
-      --border: #2e3248;
-      --text: #e8eaf0;
-      --muted: #7b82a0;
-      --accent: #6c63ff;
-      --green: #22c55e;
-      --red: #ef4444;
-      --amber: #f59e0b;
+      --bg:#0f1117; --surface:#1a1d27; --surface2:#22263a; --border:#2e3248;
+      --text:#e8eaf0; --muted:#7b82a0; --accent:#6c63ff; --green:#22c55e; --red:#ef4444; --amber:#f59e0b;
     }
-
-    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+    body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; min-height:100vh; }
 
     header {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 14px 32px;
-      display: flex; align-items: center; justify-content: space-between;
-      position: sticky; top: 0; z-index: 10;
+      background:var(--surface); border-bottom:1px solid var(--border); padding:14px 32px;
+      display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:20;
     }
-    .logo { display: flex; align-items: center; gap: 10px; }
-    .logo-icon { font-size: 26px; }
-    .logo-text { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
-    .logo-sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+    .logo { display:flex; align-items:center; gap:10px; }
+    .logo-icon { font-size:26px; }
+    .logo-text { font-size:18px; font-weight:700; letter-spacing:-0.3px; }
+    .logo-sub { font-size:12px; color:var(--muted); margin-top:1px; }
+    nav.tabs { display:flex; gap:4px; margin-left:28px; }
+    nav.tabs a { color:var(--muted); text-decoration:none; font-size:13px; font-weight:500; padding:7px 14px; border-radius:7px; transition:all .15s; }
+    nav.tabs a:hover { color:var(--text); background:var(--surface2); }
+    nav.tabs a.active { color:#fff; background:var(--accent); }
+    .header-right { display:flex; align-items:center; gap:14px; }
+    .live-pill { display:flex; align-items:center; gap:7px; font-size:12px; color:var(--muted); background:var(--surface2); border:1px solid var(--border); padding:6px 12px; border-radius:20px; }
+    .live-dot { width:8px; height:8px; border-radius:50%; background:var(--green); animation:pulse 2s infinite; }
+    .live-dot.stale { background:var(--amber); animation:none; }
+    @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(34,197,94,.5)} 70%{box-shadow:0 0 0 7px rgba(34,197,94,0)} 100%{box-shadow:0 0 0 0 rgba(34,197,94,0)} }
+    .refresh-btn { background:var(--surface2); border:1px solid var(--border); color:var(--muted); padding:6px 12px; border-radius:7px; font-size:13px; cursor:pointer; transition:all .15s; }
+    .refresh-btn:hover { color:var(--text); border-color:var(--accent); }
 
-    nav.tabs { display: flex; gap: 4px; margin-left: 28px; }
-    nav.tabs a {
-      color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 500;
-      padding: 7px 14px; border-radius: 7px; transition: all .15s;
-    }
-    nav.tabs a:hover { color: var(--text); background: var(--surface2); }
-    nav.tabs a.active { color: #fff; background: var(--accent); }
+    main { max-width:1480px; margin:0 auto; padding:26px 32px 60px; }
 
-    .header-right { display: flex; align-items: center; gap: 14px; }
-    .live-pill {
-      display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted);
-      background: var(--surface2); border: 1px solid var(--border); padding: 6px 12px; border-radius: 20px;
-    }
-    .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 0 rgba(34,197,94,0.6); animation: pulse 2s infinite; }
-    .live-dot.stale { background: var(--amber); animation: none; }
-    @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(34,197,94,0.5)} 70%{box-shadow:0 0 0 7px rgba(34,197,94,0)} 100%{box-shadow:0 0 0 0 rgba(34,197,94,0)} }
-    .refresh-btn {
-      background: var(--surface2); border: 1px solid var(--border); color: var(--muted);
-      padding: 6px 12px; border-radius: 7px; font-size: 13px; cursor: pointer; transition: all .15s;
-    }
-    .refresh-btn:hover { color: var(--text); border-color: var(--accent); }
+    .stats-row { display:grid; grid-template-columns:1.4fr 1fr 1fr 1.1fr; gap:16px; margin-bottom:18px; }
+    .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:18px 22px; }
+    .stat-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; margin-bottom:8px; }
+    .stat-value { font-size:30px; font-weight:700; letter-spacing:-.6px; font-variant-numeric:tabular-nums; }
+    .stat-sub { font-size:12px; color:var(--muted); margin-top:5px; }
+    .stat-green { color:var(--green); }
+    .stat-row2 { display:flex; align-items:baseline; gap:8px; }
+    .stat-mini { font-size:13px; color:var(--muted); font-weight:500; }
+    .ms-bar-wrap { margin-top:12px; }
+    .ms-bar-track { height:7px; background:var(--surface2); border-radius:5px; overflow:hidden; }
+    .ms-bar-fill { height:100%; background:linear-gradient(90deg,#6c63ff,#22c55e); border-radius:5px; transition:width .6s ease; }
+    .ms-bar-label { display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-top:6px; }
 
-    main { max-width: 1480px; margin: 0 auto; padding: 26px 32px 60px; }
+    .charts-grid { display:grid; grid-template-columns:1.1fr 1fr 1.2fr; gap:16px; margin-bottom:18px; }
+    .chart-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px 18px; }
+    .chart-title { font-size:13px; font-weight:600; margin-bottom:2px; }
+    .chart-sub { font-size:11px; color:var(--muted); margin-bottom:12px; }
+    .chart-box { position:relative; height:230px; }
 
-    .stats-row { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 18px; }
-    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 22px; }
-    .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px; display:flex; align-items:center; gap:6px; }
-    .stat-value { font-size: 30px; font-weight: 700; letter-spacing: -0.6px; font-variant-numeric: tabular-nums; }
-    .stat-sub { font-size: 12px; color: var(--muted); margin-top: 5px; }
-    .stat-accent { color: var(--accent); }
-    .stat-green { color: var(--green); }
+    .board-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:6px 6px 8px; }
+    .board-head { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 18px 12px; flex-wrap:wrap; }
+    .board-title { font-size:15px; font-weight:600; }
+    .board-subtitle { font-size:12px; color:var(--muted); margin-top:3px; }
+    .controls { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .search { background:var(--surface2); border:1px solid var(--border); color:var(--text); padding:8px 12px; border-radius:8px; font-size:13px; outline:none; width:200px; }
+    .search:focus { border-color:var(--accent); }
+    .seg { display:flex; background:var(--surface2); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+    .seg button { background:transparent; border:none; color:var(--muted); padding:7px 12px; font-size:12px; cursor:pointer; transition:all .15s; }
+    .seg button.active { background:var(--accent); color:#fff; }
+    .count-note { font-size:12px; color:var(--muted); }
 
-    /* milestone progress bar inside the total card */
-    .ms-bar-wrap { margin-top: 12px; }
-    .ms-bar-track { height: 7px; background: var(--surface2); border-radius: 5px; overflow: hidden; }
-    .ms-bar-fill { height: 100%; background: linear-gradient(90deg, #6c63ff, #22c55e); border-radius: 5px; transition: width .6s ease; }
-    .ms-bar-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 6px; }
+    .table-wrap { overflow-x:auto; }
+    table.board { width:100%; border-collapse:collapse; font-size:13px; }
+    table.board th { text-align:right; color:var(--muted); font-weight:500; padding:9px 12px; border-bottom:1px solid var(--border); font-size:11px; text-transform:uppercase; letter-spacing:.5px; white-space:nowrap; position:sticky; top:60px; background:var(--surface); cursor:pointer; user-select:none; }
+    table.board th.left { text-align:left; }
+    table.board th:hover { color:var(--text); }
+    table.board th.sorted { color:var(--accent); }
+    table.board th .arr { opacity:.5; margin-left:3px; }
+    table.board th.sorted .arr { opacity:1; }
+    table.board td { padding:0; border-bottom:1px solid var(--border); white-space:nowrap; }
+    table.board td .cell { padding:9px 12px; text-align:right; font-variant-numeric:tabular-nums; }
+    table.board td .cell.left { text-align:left; }
+    table.board tbody tr:hover td { outline:1px solid rgba(108,99,255,.22); outline-offset:-1px; }
+    table.board tbody tr.manual td .cell { }
+    .rank { color:var(--muted); font-size:12px; width:30px; text-align:right; padding-right:6px !important; }
+    .gname { font-weight:600; display:flex; align-items:center; gap:8px; }
+    .src { font-size:10px; font-weight:600; padding:2px 7px; border-radius:9px; letter-spacing:.3px; }
+    .src.live { background:rgba(34,197,94,.15); color:#4ade80; }
+    .src.manual { background:rgba(123,130,160,.18); color:#9aa1bd; }
+    .warn { color:var(--amber); font-size:11px; font-weight:500; }
 
-    .board-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 6px 6px 8px; }
-    .board-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px 12px; }
-    .board-title { font-size: 15px; font-weight: 600; }
-    .board-subtitle { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .num-input, .sess-input, .rate-input { background:var(--surface2); border:1px solid var(--border); color:var(--text); padding:5px 8px; border-radius:6px; font-size:13px; text-align:right; outline:none; font-variant-numeric:tabular-nums; }
+    .sess-input, .rate-input { width:62px; }
+    .num-input { width:108px; }
+    .num-input:hover, .sess-input:hover, .rate-input:hover { border-color:var(--accent); }
+    .num-input:focus, .sess-input:focus, .rate-input:focus { border-color:var(--accent); background:#1c2030; }
+    .muted { color:var(--muted); }
+    .rating-pill { display:inline-block; padding:3px 9px; border-radius:11px; font-weight:600; font-size:12px; }
+    .mini { display:flex; flex-direction:column; gap:4px; min-width:120px; }
+    .mini-top { display:flex; justify-content:space-between; font-size:11px; color:var(--muted); }
+    .mini-track { height:5px; background:var(--surface2); border-radius:4px; overflow:hidden; }
+    .mini-fill { height:100%; background:var(--accent); border-radius:4px; }
 
-    .table-wrap { overflow-x: auto; }
-    table.board { width: 100%; border-collapse: collapse; font-size: 13px; }
-    table.board th {
-      text-align: right; color: var(--muted); font-weight: 500; padding: 9px 14px;
-      border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase;
-      letter-spacing: 0.5px; white-space: nowrap; position: sticky; top: 0; background: var(--surface);
-    }
-    table.board th.left { text-align: left; }
-    table.board td { padding: 0; border-bottom: 1px solid var(--border); white-space: nowrap; }
-    table.board td .cell { padding: 10px 14px; text-align: right; font-variant-numeric: tabular-nums; }
-    table.board td .cell.left { text-align: left; }
-    table.board tbody tr:hover td { outline: 1px solid rgba(108,99,255,0.25); outline-offset: -1px; }
-    table.board tbody tr.unavailable { opacity: 0.55; }
-    .rank { color: var(--muted); font-size: 12px; width: 30px; text-align: right; padding-right: 6px !important; }
-    .gname { font-weight: 600; }
-    .gname .warn { color: var(--amber); font-size: 11px; font-weight: 500; margin-left: 6px; }
+    .loading { color:var(--muted); font-size:14px; text-align:center; padding:80px; }
+    .foot { color:var(--muted); font-size:12px; margin-top:16px; line-height:1.6; }
+    .foot b { color:var(--text); }
 
-    .sess-input {
-      width: 64px; background: var(--surface2); border: 1px solid var(--border); color: var(--text);
-      padding: 5px 8px; border-radius: 6px; font-size: 13px; text-align: right; outline: none;
-      font-variant-numeric: tabular-nums;
-    }
-    .sess-input:hover { border-color: var(--accent); }
-    .sess-input:focus { border-color: var(--accent); background: #1c2030; }
-    .sess-empty { color: var(--muted); }
-
-    .rating-pill { display: inline-block; padding: 3px 9px; border-radius: 11px; font-weight: 600; font-size: 12px; }
-
-    /* per-row next-milestone mini bar */
-    .mini { display: flex; flex-direction: column; gap: 4px; min-width: 130px; }
-    .mini-top { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
-    .mini-track { height: 5px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
-    .mini-fill { height: 100%; background: var(--accent); border-radius: 4px; }
-
-    .loading { color: var(--muted); font-size: 14px; text-align: center; padding: 80px; }
-    .foot { color: var(--muted); font-size: 12px; margin-top: 16px; line-height: 1.6; }
-    .foot b { color: var(--text); }
-
-    @media (max-width: 1000px) {
-      .stats-row { grid-template-columns: 1fr 1fr; }
-      header { flex-wrap: wrap; gap: 10px; }
-      nav.tabs { margin-left: 0; }
-      main { padding: 16px; }
-    }
+    @media (max-width:1100px){ .stats-row{grid-template-columns:1fr 1fr;} .charts-grid{grid-template-columns:1fr;} }
+    @media (max-width:1000px){ header{flex-wrap:wrap;gap:10px;} nav.tabs{margin-left:0;} main{padding:16px;} }
   </style>
 </head>
 <body>
@@ -147,13 +130,14 @@
   <div id="loading" class="loading">Fetching live data from Roblox…</div>
 
   <div id="content" style="display:none">
+    <!-- Hero stats -->
     <div class="stats-row">
       <div class="stat-card">
-        <div class="stat-label">📈 Total Visits <span style="color:var(--muted)">· all tracked games</span></div>
+        <div class="stat-label">📈 Total Visits · all games</div>
         <div class="stat-value" id="totVisits">—</div>
         <div class="ms-bar-wrap">
           <div class="ms-bar-track"><div class="ms-bar-fill" id="msFill" style="width:0%"></div></div>
-          <div class="ms-bar-label"><span id="msLeft">—</span><span id="msRight">next milestone</span></div>
+          <div class="ms-bar-label"><span id="msLeft">—</span><span id="msRight"></span></div>
         </div>
       </div>
       <div class="stat-card">
@@ -164,35 +148,67 @@
       <div class="stat-card">
         <div class="stat-label">⏱️ Total Hours Played</div>
         <div class="stat-value" id="totHours">—</div>
-        <div class="stat-sub">visits × avg session (editable)</div>
+        <div class="stat-sub">visits × avg session</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">⭐ Portfolio Rating</div>
-        <div class="stat-value" id="totRating">—</div>
-        <div class="stat-sub">like-rating, weighted by votes</div>
+        <div class="stat-label">⭐ Portfolio Rating · weighted by visits</div>
+        <div class="stat-row2">
+          <div class="stat-value" id="totRating">—</div>
+          <div class="stat-mini" id="totRatingSimple"></div>
+        </div>
+        <div class="stat-sub">each game weighted by its visit count</div>
       </div>
     </div>
 
+    <!-- Charts -->
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title">Visit Share</div>
+        <div class="chart-sub">who drives the audience</div>
+        <div class="chart-box"><canvas id="shareChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Players Online Now</div>
+        <div class="chart-sub">live concurrent players · top 10</div>
+        <div class="chart-box"><canvas id="ccuChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Rating vs Visits</div>
+        <div class="chart-sub">bubble size = visits · why the weighted rating differs</div>
+        <div class="chart-box"><canvas id="bubbleChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Table -->
     <div class="board-card">
       <div class="board-head">
         <div>
           <div class="board-title">Game Portfolio</div>
-          <div class="board-subtitle">Visits, players &amp; ratings are live from Roblox · session time is editable &amp; saved</div>
+          <div class="board-subtitle">Click a column to sort · search &amp; filter below · manual fields are editable</div>
+        </div>
+        <div class="controls">
+          <input class="search" id="search" type="search" placeholder="🔍 Filter by game name…" />
+          <div class="seg" id="srcSeg">
+            <button data-src="all" class="active">All</button>
+            <button data-src="live">Live</button>
+            <button data-src="manual">Manual</button>
+          </div>
+          <span class="count-note" id="countNote"></span>
         </div>
       </div>
       <div class="table-wrap">
         <table class="board">
           <thead>
-            <tr>
+            <tr id="headRow">
               <th class="rank">#</th>
-              <th class="left">Game</th>
-              <th>Total Visits</th>
-              <th>% Share</th>
-              <th>Players Now</th>
-              <th>Avg Session (min)</th>
-              <th>Total Hours</th>
-              <th>Rating</th>
-              <th class="left">Next Milestone</th>
+              <th class="left" data-col="name">Game <span class="arr"></span></th>
+              <th data-col="visits">Total Visits <span class="arr">↓</span></th>
+              <th data-col="pct">% Share <span class="arr"></span></th>
+              <th data-col="ccu">Players Now <span class="arr"></span></th>
+              <th data-col="avg_session_min">Avg Session (min) <span class="arr"></span></th>
+              <th data-col="total_hours">Total Hours <span class="arr"></span></th>
+              <th data-col="rating">Rating <span class="arr"></span></th>
+              <th class="left" data-col="progress">Next Milestone <span class="arr"></span></th>
             </tr>
           </thead>
           <tbody id="rows"></tbody>
@@ -206,132 +222,226 @@
 
 <script>
 const fmtFull = n => (n == null ? '—' : Number(n).toLocaleString('en-US'));
-function fmt(n) {
-  if (n == null) return '—';
-  if (n >= 1_000_000) { const m = n/1_000_000; return (m>=100? m.toFixed(0): m.toFixed(1)) + 'M'; }
-  if (n >= 1_000) return (n/1000).toFixed(n>=100000?0:1) + 'K';
-  return Number(n).toLocaleString('en-US');
-}
-function fmtShort(n) {
-  if (n == null) return '—';
-  if (n >= 1_000_000) { const m = n/1_000_000; const s = (Math.round(m*100)/100).toString(); return s + 'M'; }
-  if (n >= 1_000) return Math.round(n/1000) + 'K';
-  return String(n);
+function fmt(n){ if(n==null) return '—'; if(n>=1e6){const m=n/1e6; return (m>=100?m.toFixed(0):m.toFixed(1))+'M';} if(n>=1e3) return (n/1e3).toFixed(n>=1e5?0:1)+'K'; return Number(n).toLocaleString('en-US'); }
+function fmtShort(n){ if(n==null) return '—'; if(n>=1e6){const m=n/1e6; return (Math.round(m*100)/100)+'M';} if(n>=1e3) return Math.round(n/1e3)+'K'; return String(n); }
+
+function heatGreen(t){ const a=0.06+0.40*Math.sqrt(Math.max(0,Math.min(1,t))); return `rgba(34,197,94,${a.toFixed(3)})`; }
+function heatBlue(t){ const a=0.06+0.40*Math.sqrt(Math.max(0,Math.min(1,t))); return `rgba(108,99,255,${a.toFixed(3)})`; }
+function ratingColor(r){
+  if(r==null) return {bg:'transparent',fg:'var(--muted)'};
+  if(r>=95) return {bg:'rgba(34,197,94,.18)',fg:'#4ade80'};
+  if(r>=90) return {bg:'rgba(34,197,94,.12)',fg:'#86efac'};
+  if(r>=80) return {bg:'rgba(245,158,11,.15)',fg:'#fbbf24'};
+  return {bg:'rgba(239,68,68,.15)',fg:'#f87171'};
 }
 
-// Heatmap helpers — alpha scales with magnitude (sqrt for a gentler ramp)
-function heatGreen(t) { const a = 0.06 + 0.40 * Math.sqrt(Math.max(0, Math.min(1, t))); return `rgba(34,197,94,${a.toFixed(3)})`; }
-function heatBlue(t)  { const a = 0.06 + 0.40 * Math.sqrt(Math.max(0, Math.min(1, t))); return `rgba(108,99,255,${a.toFixed(3)})`; }
-function ratingColor(r) {
-  if (r == null) return { bg: 'transparent', fg: 'var(--muted)' };
-  if (r >= 95) return { bg: 'rgba(34,197,94,0.18)', fg: '#4ade80' };
-  if (r >= 90) return { bg: 'rgba(34,197,94,0.12)', fg: '#86efac' };
-  if (r >= 80) return { bg: 'rgba(245,158,11,0.15)', fg: '#fbbf24' };
-  return { bg: 'rgba(239,68,68,0.15)', fg: '#f87171' };
-}
+const COLORS = ['#6c63ff','#22c55e','#f59e0b','#ef4444','#06b6d4','#ec4899','#84cc16','#f97316','#a855f7','#14b8a6','#eab308','#3b82f6'];
 
+let DATA = null;
+let search = '';
+let sourceFilter = 'all';
+let sortCol = 'visits';
+let sortDir = 'desc';
+let charts = { share:null, ccu:null, bubble:null };
 let refreshTimer = null;
 
-async function loadPortfolio() {
-  // Don't yank the table out from under someone editing a session cell
-  if (document.activeElement && document.activeElement.classList.contains('sess-input')) return;
+async function loadPortfolio(){
+  if(document.activeElement && document.activeElement.matches('input.num-input, input.sess-input, input.rate-input')) return;
   try {
     const res = await fetch('/api/portfolio');
-    const d = await res.json();
-    render(d);
-  } catch (e) {
+    DATA = await res.json();
+    renderHero(DATA);
+    renderCharts(DATA);
+    renderTable();
+  } catch(e){
     document.getElementById('loading').textContent = 'Could not reach the server.';
   }
 }
 
-function render(d) {
-  document.getElementById('loading').style.display = 'none';
-  document.getElementById('content').style.display = 'block';
-
+function renderHero(d){
+  document.getElementById('loading').style.display='none';
+  document.getElementById('content').style.display='block';
   const t = d.totals;
   document.getElementById('totVisits').textContent = fmtFull(t.visits);
   document.getElementById('totCcu').textContent = fmtFull(t.ccu);
   document.getElementById('ccuSub').textContent = `across ${t.count} games · live`;
   document.getElementById('totHours').textContent = fmt(t.hours);
-  document.getElementById('totRating').textContent = t.rating == null ? '—' : t.rating + '%';
+  document.getElementById('totRating').textContent = t.rating==null ? '—' : t.rating+'%';
+  document.getElementById('totRatingSimple').textContent = t.rating_simple==null ? '' : `simple avg ${t.rating_simple}%`;
 
-  // portfolio milestone progress
-  const prevRung = (t.next_milestone || 0) - 25_000_000;
   const pct = Math.max(0, Math.min(100, t.progress ?? 0));
-  document.getElementById('msFill').style.width = pct + '%';
-  const toGo = (t.next_milestone || 0) - t.visits;
+  document.getElementById('msFill').style.width = pct+'%';
+  const toGo = (t.next_milestone||0) - t.visits;
   document.getElementById('msLeft').textContent = `${pct.toFixed(1)}% to ${fmtShort(t.next_milestone)}`;
-  document.getElementById('msRight').textContent = toGo > 0 ? `${fmtFull(toGo)} to go` : '';
+  document.getElementById('msRight').textContent = toGo>0 ? `${fmtFull(toGo)} to go` : '';
 
-  // live/stale indicator
-  const dot = document.getElementById('liveDot'), lbl = document.getElementById('liveLabel');
-  if (d.live) { dot.classList.remove('stale'); lbl.textContent = 'Live'; }
-  else { dot.classList.add('stale'); lbl.textContent = 'Last snapshot'; }
+  const dot=document.getElementById('liveDot'), lbl=document.getElementById('liveLabel');
+  if(d.live){ dot.classList.remove('stale'); lbl.textContent='Live'; }
+  else { dot.classList.add('stale'); lbl.textContent='Last snapshot'; }
+}
 
-  // column maxima for heatmap scaling
-  const maxV = Math.max(...d.games.map(g => g.visits || 0), 1);
-  const maxPct = Math.max(...d.games.map(g => g.pct || 0), 1);
-  const maxCcu = Math.max(...d.games.map(g => g.ccu || 0), 1);
-  const maxHours = Math.max(...d.games.map(g => g.total_hours || 0), 1);
+const chartOpts = (extra={}) => ({
+  responsive:true, maintainAspectRatio:false,
+  plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'#1a1d27', borderColor:'#2e3248', borderWidth:1, titleColor:'#e8eaf0', bodyColor:'#cdd2e6', padding:10 } },
+  ...extra
+});
 
-  const rows = document.getElementById('rows');
-  rows.innerHTML = '';
-  d.games.forEach((g, i) => {
-    const tr = document.createElement('tr');
-    if (!g.available) tr.className = 'unavailable';
+function renderCharts(d){
+  const games = d.games.filter(g=>g.visits);
+  const byVisits = [...games].sort((a,b)=>b.visits-a.visits);
 
-    const rc = ratingColor(g.rating);
-    const sessVal = g.avg_session_min != null ? g.avg_session_min : '';
-    const miniPct = g.progress == null ? 0 : Math.max(0, Math.min(100, g.progress));
-    const nextLabel = g.next_milestone ? fmtShort(g.next_milestone) : '—';
-    const warn = g.available ? '' : `<span class="warn" title="This universe ID returns no data — the game may be private or removed. Update its ID in main.py.">⚠ ID needs fixing</span>`;
+  // 1) Visit share doughnut: top 8 + Others
+  const topN = byVisits.slice(0,8);
+  const othersV = byVisits.slice(8).reduce((s,g)=>s+(g.visits||0),0);
+  const shareLabels = topN.map(g=>g.name).concat(othersV>0?['Others']:[]);
+  const shareData = topN.map(g=>g.visits).concat(othersV>0?[othersV]:[]);
+  const shareColors = shareLabels.map((_,i)=> i<COLORS.length?COLORS[i]:'#3a3f57');
+  if(charts.share) charts.share.destroy();
+  charts.share = new Chart(document.getElementById('shareChart'), {
+    type:'doughnut',
+    data:{ labels:shareLabels, datasets:[{ data:shareData, backgroundColor:shareColors, borderColor:'#1a1d27', borderWidth:2 }] },
+    options: chartOpts({ cutout:'58%', plugins:{ legend:{ display:true, position:'right', labels:{ color:'#9aa1bd', font:{size:10}, boxWidth:10, padding:6 } }, tooltip:{ callbacks:{ label:c=>` ${c.label}: ${fmt(c.parsed)} (${(c.parsed/d.totals.visits*100).toFixed(1)}%)` } } } })
+  });
+
+  // 2) Players online now: top 10 live by ccu
+  const ccuGames = d.games.filter(g=>g.source==='live' && g.ccu>0).sort((a,b)=>b.ccu-a.ccu).slice(0,10);
+  if(charts.ccu) charts.ccu.destroy();
+  charts.ccu = new Chart(document.getElementById('ccuChart'), {
+    type:'bar',
+    data:{ labels:ccuGames.map(g=>g.name), datasets:[{ data:ccuGames.map(g=>g.ccu), backgroundColor:'rgba(108,99,255,.65)', borderColor:'#6c63ff', borderWidth:1, borderRadius:5 }] },
+    options: chartOpts({ indexAxis:'y',
+      scales:{ x:{ grid:{color:'#1e2235'}, ticks:{color:'#7b82a0', font:{size:10}, callback:v=>fmt(v)} }, y:{ grid:{display:false}, ticks:{color:'#9aa1bd', font:{size:10}} } },
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:c=>` ${c.parsed.x.toLocaleString()} players` } } } })
+  });
+
+  // 3) Rating vs visits bubble (rated games only)
+  const rated = d.games.filter(g=>g.rating!=null && g.visits);
+  const maxV = Math.max(...rated.map(g=>g.visits),1);
+  const bubble = rated.map((g,i)=>({ x:g.visits, y:g.rating, r:5+18*Math.sqrt(g.visits/maxV), _n:g.name, _s:g.source }));
+  if(charts.bubble) charts.bubble.destroy();
+  charts.bubble = new Chart(document.getElementById('bubbleChart'), {
+    type:'bubble',
+    data:{ datasets:[{ data:bubble, backgroundColor:bubble.map(b=> b._s==='live'?'rgba(108,99,255,.55)':'rgba(245,158,11,.5)'), borderColor:bubble.map(b=> b._s==='live'?'#6c63ff':'#f59e0b'), borderWidth:1 }] },
+    options: chartOpts({
+      scales:{
+        x:{ type:'logarithmic', grid:{color:'#1e2235'}, ticks:{color:'#7b82a0', font:{size:10}, callback:v=>fmt(v)}, title:{display:true,text:'visits (log)',color:'#7b82a0',font:{size:10}} },
+        y:{ grid:{color:'#1e2235'}, ticks:{color:'#7b82a0', font:{size:10}, callback:v=>v+'%'}, suggestedMin:65, suggestedMax:100, title:{display:true,text:'rating',color:'#7b82a0',font:{size:10}} }
+      },
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:c=>` ${c.raw._n}: ${c.raw.y}% · ${fmt(c.raw.x)} visits` } } }
+    })
+  });
+}
+
+function sortGames(games){
+  const dir = sortDir==='asc'?1:-1;
+  return [...games].sort((a,b)=>{
+    let av=a[sortCol], bv=b[sortCol];
+    if(sortCol==='name'){ return dir * String(av).localeCompare(String(bv)); }
+    if(av==null) return 1; if(bv==null) return -1;   // nulls always last
+    return dir*(av-bv);
+  });
+}
+
+function renderTable(){
+  if(!DATA) return;
+  let games = DATA.games.slice();
+  if(sourceFilter!=='all') games = games.filter(g=>g.source===sourceFilter);
+  if(search) games = games.filter(g=>g.name.toLowerCase().includes(search));
+  games = sortGames(games);
+
+  // column maxima for heatmap (over full set, stable colors)
+  const all = DATA.games;
+  const maxV=Math.max(...all.map(g=>g.visits||0),1), maxPct=Math.max(...all.map(g=>g.pct||0),1);
+  const maxCcu=Math.max(...all.map(g=>g.ccu||0),1), maxH=Math.max(...all.map(g=>g.total_hours||0),1);
+
+  // header arrows
+  document.querySelectorAll('th[data-col]').forEach(th=>{
+    const c=th.dataset.col, arr=th.querySelector('.arr');
+    th.classList.toggle('sorted', c===sortCol);
+    arr.textContent = c===sortCol ? (sortDir==='asc'?'↑':'↓') : '';
+  });
+
+  const rows=document.getElementById('rows');
+  rows.innerHTML='';
+  games.forEach((g,i)=>{
+    const tr=document.createElement('tr');
+    if(g.source==='manual') tr.className='manual';
+    const rc=ratingColor(g.rating);
+    const canEdit = f => g.editable && g.editable.includes(f);
+    const miniPct = g.progress==null?0:Math.max(0,Math.min(100,g.progress));
+    const srcBadge = g.source==='live'
+      ? `<span class="src live">● LIVE</span>`
+      : `<span class="src manual">✎ MANUAL</span>`;
+    const warn = (g.source==='live' && !g.available) ? `<span class="warn" title="This universe ID returns no data — the game may be private or removed.">⚠</span>` : '';
+
+    // cells
+    const visitsCell = canEdit('visits')
+      ? `<input class="num-input" type="number" min="0" step="1" value="${g.visits ?? ''}" data-id="${g.id}" data-field="visits" />`
+      : fmtFull(g.visits);
+    const ratingCell = canEdit('rating')
+      ? `<input class="rate-input" type="number" min="0" max="100" step="0.1" value="${g.rating ?? ''}" data-id="${g.id}" data-field="rating" placeholder="—" />`
+      : `<span class="rating-pill" style="background:${rc.bg};color:${rc.fg}">${g.rating!=null?g.rating+'%':'—'}</span>`;
+    const sessCell = `<input class="sess-input" type="number" min="0" step="0.1" value="${g.avg_session_min ?? ''}" data-id="${g.id}" data-field="avg_session_min" placeholder="—" />`;
+    const ccuCell = g.source==='live' ? fmtFull(g.ccu) : '<span class="muted">—</span>';
 
     tr.innerHTML = `
-      <td class="rank">${i + 1}</td>
-      <td><div class="cell left gname">${g.name}${warn}</div></td>
-      <td style="background:${g.visits ? heatGreen((g.visits)/maxV) : 'transparent'}"><div class="cell">${fmtFull(g.visits)}</div></td>
-      <td style="background:${g.pct ? heatGreen(g.pct/maxPct) : 'transparent'}"><div class="cell">${g.pct ? g.pct + '%' : '—'}</div></td>
-      <td style="background:${g.ccu ? heatBlue(g.ccu/maxCcu) : 'transparent'}"><div class="cell">${fmtFull(g.ccu)}</div></td>
-      <td><div class="cell"><input class="sess-input ${sessVal===''?'sess-empty':''}" type="number" step="0.1" min="0" value="${sessVal}" data-uid="${g.uid}" placeholder="—" /></div></td>
-      <td style="background:${g.total_hours ? heatGreen(g.total_hours/maxHours) : 'transparent'}"><div class="cell">${g.total_hours != null ? fmt(g.total_hours) : '—'}</div></td>
-      <td><div class="cell"><span class="rating-pill" style="background:${rc.bg};color:${rc.fg}">${g.rating != null ? g.rating + '%' : '—'}</span></div></td>
+      <td class="rank">${i+1}</td>
+      <td><div class="cell left gname">${g.name} ${srcBadge} ${warn}</div></td>
+      <td style="background:${g.visits?heatGreen(g.visits/maxV):'transparent'}"><div class="cell">${visitsCell}</div></td>
+      <td style="background:${g.pct?heatGreen(g.pct/maxPct):'transparent'}"><div class="cell">${g.pct?g.pct+'%':'—'}</div></td>
+      <td style="background:${g.ccu?heatBlue(g.ccu/maxCcu):'transparent'}"><div class="cell">${ccuCell}</div></td>
+      <td><div class="cell">${sessCell}</div></td>
+      <td style="background:${g.total_hours?heatGreen(g.total_hours/maxH):'transparent'}"><div class="cell">${g.total_hours!=null?fmt(g.total_hours):'—'}</div></td>
+      <td><div class="cell">${ratingCell}</div></td>
       <td><div class="cell left"><div class="mini">
-        <div class="mini-top"><span>→ ${nextLabel}</span><span>${g.progress != null ? miniPct.toFixed(0)+'%' : ''}</span></div>
+        <div class="mini-top"><span>→ ${g.next_milestone?fmtShort(g.next_milestone):'—'}</span><span>${g.progress!=null?miniPct.toFixed(0)+'%':''}</span></div>
         <div class="mini-track"><div class="mini-fill" style="width:${miniPct}%"></div></div>
-      </div></div></td>
-    `;
+      </div></div></td>`;
     rows.appendChild(tr);
   });
 
-  // wire session-time editing
-  rows.querySelectorAll('.sess-input').forEach(inp => {
-    inp.addEventListener('change', async () => {
-      const uid = inp.dataset.uid;
-      const val = inp.value === '' ? null : parseFloat(inp.value);
-      inp.disabled = true;
+  document.getElementById('countNote').textContent = `${games.length} of ${DATA.games.length} games`;
+
+  // wire edits
+  rows.querySelectorAll('input[data-field]').forEach(inp=>{
+    inp.addEventListener('change', async ()=>{
+      inp.disabled=true;
       try {
-        await fetch('/api/manual', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ uid, avg_session_min: val }),
-        });
-        await loadPortfolio();  // recompute hours + totals
-      } finally { inp.disabled = false; }
+        await fetch('/api/edit', { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ id:inp.dataset.id, field:inp.dataset.field, value: inp.value===''?null:inp.value }) });
+        await loadPortfolio();
+      } finally { inp.disabled=false; }
     });
   });
 
-  const ago = new Date().toLocaleTimeString('en-GB');
+  const ago=new Date().toLocaleTimeString('en-GB');
   document.getElementById('foot').innerHTML =
-    `Visits, concurrent players and ratings pull live from Roblox's public API (cached ~60s). ` +
-    `Session time is entered by you and saved. Hours = visits × avg session ÷ 60. ` +
-    `Milestone alerts post to Slack automatically. <br>Last updated <b>${ago}</b>` +
-    (d.live ? '' : ' · ⚠️ Roblox API was unreachable, showing the last saved snapshot.');
+    `Visits, players &amp; ratings on <b>LIVE</b> games pull from Roblox every ~60s. <b>MANUAL</b> games are entered by hand (seeded from your sheet) — their visits, rating and session are editable inline. ` +
+    `Portfolio rating is <b>weighted by visits</b>. Hours = visits × avg session ÷ 60. Last updated <b>${ago}</b>` +
+    (DATA.live?'':' · ⚠️ Roblox API unreachable, showing last saved snapshot.');
 }
 
+// header sort
+document.getElementById('headRow').addEventListener('click', e=>{
+  const th=e.target.closest('th[data-col]'); if(!th) return;
+  const c=th.dataset.col;
+  if(sortCol===c){ sortDir = sortDir==='asc'?'desc':'asc'; }
+  else { sortCol=c; sortDir = (c==='name')?'asc':'desc'; }
+  renderTable();
+});
+// search
+document.getElementById('search').addEventListener('input', e=>{ search=e.target.value.trim().toLowerCase(); renderTable(); });
+// source filter
+document.getElementById('srcSeg').addEventListener('click', e=>{
+  const b=e.target.closest('button[data-src]'); if(!b) return;
+  sourceFilter=b.dataset.src;
+  document.querySelectorAll('#srcSeg button').forEach(x=>x.classList.toggle('active', x===b));
+  renderTable();
+});
 document.getElementById('refreshBtn').addEventListener('click', loadPortfolio);
 
 loadPortfolio();
-refreshTimer = setInterval(loadPortfolio, 60_000);
+refreshTimer = setInterval(loadPortfolio, 60000);
 </script>
-
 </body>
 </html>
