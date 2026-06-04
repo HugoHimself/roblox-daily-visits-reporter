@@ -10,7 +10,8 @@
     },
     "6981432181": {},
     "7229780065": {
-      "ccu_peak": 1401,
+      "ccu_alert_iso": "2026-06-04T05:11:34.493295+00:00",
+      "ccu_peak": 1694,
       "visits_rung": 120000000
     },
     "7306273010": {
@@ -18,7 +19,8 @@
       "visits_rung": 1000000
     },
     "7436965994": {
-      "ccu_peak": 62,
+      "ccu_alert_iso": "2026-06-04T05:11:34.493295+00:00",
+      "ccu_peak": 63,
       "visits_rung": 10000000
     },
     "7448978668": {
@@ -50,7 +52,8 @@
       "visits_rung": null
     },
     "9054548108": {
-      "ccu_peak": 2288,
+      "ccu_alert_iso": "2026-06-04T05:11:34.493295+00:00",
+      "ccu_peak": 2453,
       "visits_rung": 10000000
     },
     "9328305853": {
@@ -80,9 +83,105 @@
     "9803070785": {
       "ccu_peak": 13,
       "visits_rung": 1000000
+    },
+    "x_american_supermarket_simulator": {
+      "visits_rung": null
+    },
+    "x_anime_demon_survival": {
+      "visits_rung": null
+    },
+    "x_boss_immersive_show": {
+      "visits_rung": null
+    },
+    "x_build_my_city": {
+      "visits_rung": null
+    },
+    "x_color_catch": {
+      "visits_rung": null
+    },
+    "x_coty_campus_hub": {
+      "visits_rung": null
+    },
+    "x_coty_sally_hansen": {
+      "visits_rung": null
+    },
+    "x_creator_avatar_editor": {
+      "visits_rung": null
+    },
+    "x_credit_agricole": {
+      "visits_rung": null
+    },
+    "x_deloitte": {
+      "visits_rung": null
+    },
+    "x_dfw": {
+      "visits_rung": null
+    },
+    "x_diac": {
+      "visits_rung": null
+    },
+    "x_dubai_boat_show": {
+      "visits_rung": null
+    },
+    "x_exclusible_codes": {
+      "visits_rung": null
+    },
+    "x_get_there_fall_guys_obby": {
+      "visits_rung": null
+    },
+    "x_hogan_decentraland_dance": {
+      "visits_rung": null
+    },
+    "x_legacy_glow_up_elf": {
+      "visits_rung": null
+    },
+    "x_makeup_store_simulator": {
+      "visits_rung": null
+    },
+    "x_mbw_decentraland": {
+      "visits_rung": null
+    },
+    "x_mbw_spatial": {
+      "visits_rung": null
+    },
+    "x_my_bff_closet": {
+      "visits_rung": null
+    },
+    "x_my_candy_factory": {
+      "visits_rung": null
+    },
+    "x_palace_season_2_sandbox": {
+      "visits_rung": null
+    },
+    "x_penthouses": {
+      "visits_rung": null
+    },
+    "x_pirate_training": {
+      "visits_rung": null
+    },
+    "x_push_them_off": {
+      "visits_rung": null
+    },
+    "x_raise_a_cat": {
+      "visits_rung": null
+    },
+    "x_superstar_mansion_tycoon": {
+      "visits_rung": 10000000
+    },
+    "x_tapping_league_x": {
+      "visits_rung": 1000000
+    },
+    "x_tapping_masters": {
+      "visits_rung": 1000000
+    },
+    "x_tractor_training": {
+      "visits_rung": null
+    },
+    "x_unbox_a_brainrot_shop": {
+      "visits_rung": null
     }
   },
   "initialized": true,
-  "last_checked": "2026-06-03T22:21:58.540381+00:00",
+  "last_checked": "2026-06-04T05:11:34.493295+00:00",
   "total_rung": 275000000
 }
