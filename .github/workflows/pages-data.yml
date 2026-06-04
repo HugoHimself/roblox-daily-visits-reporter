@@ -2,8 +2,8 @@ name: Pages Data Refresh
 
 on:
   schedule:
-    # Every 30 minutes, offset to avoid colliding with the other data jobs
-    - cron: "5,35 * * * *"
+    # Every 10 minutes, offset off the ccu (:10) and milestone (:20) jobs
+    - cron: "5,15,25,35,45,55 * * * *"
   push:
     branches: [main]
     paths:
