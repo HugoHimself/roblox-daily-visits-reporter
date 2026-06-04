@@ -44,6 +44,7 @@ KNOWN_CCU_PEAKS: dict[str, int] = {
     "7229780065": 9000,    # Hunted
     "8738763254": 19900,   # Sesame Street Neighborhood Adventures
     "9328305853": 16000,   # Winx
+    "9054548108": 15500,   # Rabbids Takeover
     "9710205604": 8500,    # Clean Crew
     "7486728492": 5000,    # Japanese Supermarket Simulator
     "7436965994": 4400,    # MMA Fighters
