@@ -33,8 +33,24 @@ _VISIT_STEP = 10_000_000              # a rung every +10M from 10M upward
 _VISIT_CEILING = 3_000_000_000        # generate rungs up to 3B
 
 TOTAL_STEP = 25_000_000               # portfolio total: a rung every +25M
-MIN_CCU_RECORD = 50                   # ignore "records" below this (noise floor)
+MIN_CCU_RECORD = 250                  # ignore CCU "records" below this many players
 CCU_RECORD_COOLDOWN_HOURS = 20        # at most one CCU record per game / ~day
+
+# Known historical all-time CCU peaks supplied by the team. The Roblox API can't
+# report a game's past peak, so without these the engine would treat any climb
+# above the first value it happened to observe as a "record". The stored peak is
+# floored to at least this number, keyed by universe id.
+KNOWN_CCU_PEAKS: dict[str, int] = {
+    "7229780065": 9000,    # Hunted
+    "8738763254": 19900,   # Sesame Street Neighborhood Adventures
+    "9328305853": 16000,   # Winx
+    "9710205604": 8500,    # Clean Crew
+    "7486728492": 5000,    # Japanese Supermarket Simulator
+    "7436965994": 4400,    # MMA Fighters
+    "5988568657": 3600,    # Care Bears Caring Quest
+    "9368056464": 3000,    # Glow Up by E.L.F Cosmetics
+    "6906503978": 698,     # Art Leap by Belvedere Museum
+}
 
 
 def visit_rungs() -> list[int]:
@@ -142,7 +158,9 @@ def check(
         # --- Per-game all-time CCU records ---
         if uid in ccu:
             c = ccu[uid]
-            peak = gs.get("ccu_peak", 0)
+            # Floor the stored peak with any known historical peak, so a normal
+            # number is never mistaken for an all-time record.
+            peak = max(gs.get("ccu_peak", 0), KNOWN_CCU_PEAKS.get(uid, 0))
             if first_run or "ccu_peak" not in gs:
                 gs["ccu_peak"] = max(peak, c)                 # silent baseline
             elif c > peak and c >= MIN_CCU_RECORD:
