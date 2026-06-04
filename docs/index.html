@@ -108,7 +108,7 @@
   <div id="loading" class="loading">Loading the latest snapshot…</div>
 
   <div id="content" style="display:none">
-    <div class="banner">📡 <b>Hosted snapshot</b> — visits, players &amp; ratings refresh automatically about every 30&nbsp;minutes. This page is view-only; edit session times &amp; manual games in the local app.</div>
+    <div class="banner">📡 <b>Hosted snapshot</b> — visits, players &amp; ratings refresh automatically about every 10&nbsp;minutes. This page is view-only; edit session times &amp; manual games in the local app.</div>
 
     <div class="stats-row">
       <div class="stat-card">
@@ -266,7 +266,7 @@ function renderTable(){
     rows.appendChild(tr);
   });
   document.getElementById('countNote').textContent=`${games.length} of ${DATA.games.length} games`;
-  document.getElementById('foot').innerHTML = `Auto-built by GitHub Actions about every 30 min from Roblox's public API + your manual entries. Rating is <b>weighted by visits</b>. Snapshot generated <b>${ago(DATA.generated_at)}</b>.`;
+  document.getElementById('foot').innerHTML = `Auto-built by GitHub Actions about every 10 min from Roblox's public API + your manual entries. Rating is <b>weighted by visits</b>. Snapshot generated <b>${ago(DATA.generated_at)}</b>.`;
 }
 
 document.getElementById('headRow').addEventListener('click',e=>{ const th=e.target.closest('th[data-col]'); if(!th) return; const c=th.dataset.col; if(sortCol===c) sortDir=sortDir==='asc'?'desc':'asc'; else { sortCol=c; sortDir=(c==='name')?'asc':'desc'; } renderTable(); });
