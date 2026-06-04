@@ -182,9 +182,9 @@ def _game_row(gid, name, source, visits, ccu, rating, avg_min, available, editab
     }
 
 
-@app.route("/api/portfolio")
-def api_portfolio():
-    """Live + manual cumulative stats per game, portfolio totals, milestone progress."""
+def compute_portfolio() -> dict:
+    """Live + manual cumulative stats per game, portfolio totals, milestone
+    progress. Shared by the /api/portfolio route and the Pages build script."""
     live = get_live()
     manual = load_manual()
     extra = load_extra_games()
@@ -233,7 +233,7 @@ def api_portfolio():
     next_total = (cur_total + ms.TOTAL_STEP) if cur_total is not None else ms.TOTAL_STEP
     total_progress = round((total_visits - (cur_total or 0)) / ms.TOTAL_STEP * 100, 1)
 
-    return jsonify({
+    return {
         "games": games,
         "totals": {
             "visits": total_visits, "ccu": total_ccu, "hours": total_hours,
@@ -242,7 +242,12 @@ def api_portfolio():
             "count": len(games), "rated_count": len(rated),
         },
         "live": live["live"],
-    })
+    }
+
+
+@app.route("/api/portfolio")
+def api_portfolio():
+    return jsonify(compute_portfolio())
 
 
 @app.route("/api/edit", methods=["POST"])
