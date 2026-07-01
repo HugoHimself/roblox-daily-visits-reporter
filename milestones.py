@@ -51,6 +51,8 @@ KNOWN_CCU_PEAKS: dict[str, int] = {
     "5988568657": 3600,    # Care Bears Caring Quest
     "9368056464": 3000,    # Glow Up by E.L.F Cosmetics
     "6906503978": 698,     # Art Leap by Belvedere Museum
+    "7196736932": 8000,    # Own a Pizza Tycoon
+    "10198567936": 250,    # Eat a Slime
 }
 
 

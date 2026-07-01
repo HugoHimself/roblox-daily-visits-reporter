@@ -57,6 +57,8 @@ GAMES: dict[str, int] = {
     "Wizard Training Simulator": 7448978668,
     "Princess Palace Tycoon": 7306273010,
     "My Brainrot Stand": 9674557095,
+    "Own a Pizza Tycoon": 7196736932,
+    "Eat a Slime": 10198567936,
 }
 
 # ---------------------------------------------------------------------------
