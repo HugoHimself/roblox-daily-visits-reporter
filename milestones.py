@@ -53,6 +53,7 @@ KNOWN_CCU_PEAKS: dict[str, int] = {
     "6906503978": 698,     # Art Leap by Belvedere Museum
     "7196736932": 8000,    # Own a Pizza Tycoon
     "10198567936": 250,    # Eat a Slime
+    "9762578530": 800,     # Color Catch
 }
 
 
