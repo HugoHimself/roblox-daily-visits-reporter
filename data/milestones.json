@@ -94,7 +94,7 @@
     },
     "9762578530": {
       "ccu_peak": 800,
-      "visits_rung": null
+      "visits_rung": 1000000
     },
     "9803070785": {
       "ccu_peak": 13,
@@ -198,6 +198,6 @@
     }
   },
   "initialized": true,
-  "last_checked": "2026-07-05T00:14:32.487743+00:00",
+  "last_checked": "2026-07-05T04:32:08.770025+00:00",
   "total_rung": 325000000
 }
