@@ -19,6 +19,7 @@ from pathlib import Path
 
 import requests
 
+import games_config
 import milestones
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -33,36 +34,10 @@ if _env_file.exists():
             os.environ.setdefault(_k.strip(), _v.strip())
 
 # ---------------------------------------------------------------------------
-# Game config — add/remove games here, categories are auto-assigned by CCU
+# Game roster — lives in data/games.json (add with add_game.py); categories are
+# auto-assigned by CCU at run time
 # ---------------------------------------------------------------------------
-GAMES: dict[str, int] = {
-    "Hunted": 7229780065,
-    "Winx": 9328305853,
-    "Glow Up": 9368056464,
-    "Rabbids Takeover": 9054548108,
-    "Japanese Supermarket Simulator": 7486728492,
-    "Care Bears Caring Quest": 5988568657,
-    "Dress Up BFF": 7737898405,
-    "Care Bears Knockout": 9803070785,
-    "Boat Racing": 8804313953,
-    "Clean Crew": 9710205604,
-    "MMA Fighters": 7436965994,
-    "My Town": 9713686345,
-    "Supermarket Simulator 2": 9550290526,
-    "Ninja Training": 6981432181,
-    "Sesame Street Neighborhood Adventures": 8738763254,
-    "Chicken Jockey Training": 7552570368,
-    "Wheelchair Training": 7475643372,
-    "Art Leap by Belvedere Museum": 6906503978,
-    "Wizard Training Simulator": 7448978668,
-    "Princess Palace Tycoon": 7306273010,
-    "My Brainrot Stand": 9674557095,
-    "Own a Pizza Tycoon": 7196736932,
-    "Eat a Slime": 10198567936,
-    "Color Catch": 9762578530,
-    "My Salon Empire": 10092472345,
-    "Sell Burgers": 10589369349,
-}
+GAMES: dict[str, int] = games_config.games_dict()
 
 # ---------------------------------------------------------------------------
 # Constants

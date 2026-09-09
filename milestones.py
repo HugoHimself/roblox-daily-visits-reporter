@@ -20,6 +20,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import games_config
+
 # ---------------------------------------------------------------------------
 # Threshold configuration — tweak freely
 # ---------------------------------------------------------------------------
@@ -39,22 +41,9 @@ CCU_RECORD_COOLDOWN_HOURS = 20        # at most one CCU record per game / ~day
 # Known historical all-time CCU peaks supplied by the team. The Roblox API can't
 # report a game's past peak, so without these the engine would treat any climb
 # above the first value it happened to observe as a "record". The stored peak is
-# floored to at least this number, keyed by universe id.
-KNOWN_CCU_PEAKS: dict[str, int] = {
-    "7229780065": 9000,    # Hunted
-    "8738763254": 19900,   # Sesame Street Neighborhood Adventures
-    "9328305853": 16000,   # Winx
-    "9054548108": 15500,   # Rabbids Takeover
-    "9710205604": 8500,    # Clean Crew
-    "7486728492": 5000,    # Japanese Supermarket Simulator
-    "7436965994": 4400,    # MMA Fighters
-    "5988568657": 3600,    # Care Bears Caring Quest
-    "9368056464": 3000,    # Glow Up by E.L.F Cosmetics
-    "6906503978": 698,     # Art Leap by Belvedere Museum
-    "7196736932": 8000,    # Own a Pizza Tycoon
-    "10198567936": 250,    # Eat a Slime
-    "9762578530": 800,     # Color Catch
-}
+# floored to at least this number, keyed by universe id. Sourced from the
+# ccu_peak field of each entry in data/games.json.
+KNOWN_CCU_PEAKS: dict[str, int] = games_config.known_ccu_peaks()
 
 
 def visit_rungs() -> list[int]:

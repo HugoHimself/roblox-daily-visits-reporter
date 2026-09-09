@@ -94,22 +94,27 @@ To ensure `SLACK_BOT_TOKEN` is available in the cron environment, either:
 
 ## Adding or deactivating games
 
-Edit the `GAMES` dict at the top of `main.py`:
+The roster lives in `data/games.json` — one entry per game:
 
-```python
-GAMES = {
-    "Active": {
-        "Hunted": 136431686349723,
-        "Winx": 76737571462455,
-        "NewGame": 123456789,       # add here
-    },
-    "Non-Active": {
-        "OldGame": 987654321,       # move here to keep history but exclude from totals
-    },
-}
+```json
+{ "name": "Hunted", "universe_id": 7229780065, "ccu_peak": 9000 }
 ```
 
-Categories with no games are automatically hidden from the Slack message.
+Add a game with the helper. It turns the Place ID from the game URL into the
+universe id, verifies the game returns live data, and appends the entry:
+
+```bash
+python add_game.py https://www.roblox.com/games/73503837134305/Color-Catch=800
+python add_game.py 76192781446190 86247005360203=1.7K --commit --push
+```
+
+`=<peak>` seeds the game's known all-time CCU peak so the milestone engine
+never mistakes a normal day for an all-time "record". Running it again with
+`=<peak>` on an already-tracked game updates that peak.
+
+Active / Non-Active is decided automatically at run time from live CCU
+(`ACTIVE_CCU_THRESHOLD` in `main.py`). To stop tracking a game, delete its
+entry from `data/games.json`; its history in `data/*.json` is kept.
 
 ---
 
