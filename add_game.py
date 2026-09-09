@@ -36,6 +36,17 @@ UNIVERSE_URL = "https://apis.roblox.com/universes/v1/places/{place}/universe"
 GAMES_URL = "https://games.roblox.com/v1/games?universeIds={ids}"
 
 
+def _read(p: Path) -> str:
+    """Read preserving the file's own line endings (no CRLF rewrite on Windows)."""
+    with open(p, encoding="utf-8", newline="") as f:
+        return f.read()
+
+
+def _write(p: Path, s: str) -> None:
+    with open(p, "w", encoding="utf-8", newline="") as f:
+        f.write(s)
+
+
 # ---------------------------------------------------------------------------
 # Roblox lookups
 # ---------------------------------------------------------------------------
@@ -113,8 +124,8 @@ def main() -> int:
     ap.add_argument("--push", action="store_true", help="git push HEAD:main after committing")
     args = ap.parse_args()
 
-    main_src = MAIN_PY.read_text(encoding="utf-8")
-    ms_src = MILESTONES_PY.read_text(encoding="utf-8")
+    main_src = _read(MAIN_PY)
+    ms_src = _read(MILESTONES_PY)
     tracked = games_already_tracked(main_src)
 
     # 1. resolve everything first so a bad ID aborts before any edit
@@ -157,9 +168,9 @@ def main() -> int:
         print(f"\n(dry run) would add {len(added)} game(s)")
         return 0
 
-    MAIN_PY.write_text(main_src, encoding="utf-8")
+    _write(MAIN_PY, main_src)
     if any(p is not None for _, _, p in added):
-        MILESTONES_PY.write_text(ms_src, encoding="utf-8")
+        _write(MILESTONES_PY, ms_src)
 
     # sanity: the edited modules must still import
     subprocess.run([sys.executable, "-c", "import main, milestones"], check=True, cwd=ROOT)
